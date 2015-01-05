@@ -1,0 +1,30 @@
+{
+  "name": "gaia-video-control-bar",
+  "homepage": "https://github.com/gaia-components/gaia-video-control-bar",
+  "license": "ISC",
+  "main": "script.js",
+  "directories": {
+    "example": "examples",
+    "test": "test"
+  },
+  "devDependencies": {
+    "bower": "^1.3.5",
+    "browserify": "^5.11.2"
+  },
+  "scripts": {
+    "install": "bower install",
+    "build": "mkdir -p dist && browserify gaia-video-control-bar.js --outfile ./dist/gaia-video-control-bar.js --standalone VideoControlBar"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/gaia-components/gaia-video-control-bar.git"
+  },
+  "bugs": {
+    "url": "https://github.com/gaia-components/gaia-video-control-bar/issues"
+  },
+  "browser": {
+    "gaia-component": "./bower_components/gaia-component/gaia-component.js",
+    "gaia-icons": "./bower_components/gaia-icons/gaia-icons.js",
+    "pressed": "./bower_components/pressed/pressed.js"
+  }
+}
