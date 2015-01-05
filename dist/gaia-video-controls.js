@@ -206,41 +206,6 @@ function injectGlobalCss(css) {
 c(require,exports,module);}:function(c){var m={exports:{}};c(function(n){
 return w[n];},m.exports,m);w[n]=m.exports;};})('gaia-component',this));
 },{}],2:[function(require,module,exports){
-(function(define){define(function(require,exports,module){
-/*jshint laxbreak:true*/
-
-/**
- * Exports
- */
-
-var base = window.GAIA_ICONS_BASE_URL
-  || window.COMPONENTS_BASE_URL
-  || 'bower_components/';
-
-// Load it if it's not already loaded
-if (!isLoaded()) { load(base + 'gaia-icons/gaia-icons.css'); }
-
-function load(href) {
-  var link = document.createElement('link');
-  link.rel = 'stylesheet';
-  link.type = 'text/css';
-  link.href = href;
-  document.head.appendChild(link);
-  exports.loaded = true;
-}
-
-function isLoaded() {
-  return exports.loaded ||
-    document.querySelector('link[href*=gaia-icons]') ||
-    document.documentElement.classList.contains('gaia-icons-loaded');
-}
-
-});})(typeof define=='function'&&define.amd?define
-:(function(n,w){return typeof module=='object'?function(c){
-c(require,exports,module);}:function(c){var m={exports:{}};c(function(n){
-return w[n];},m.exports,m);w[n]=m.exports;};})('gaia-icons',this));
-
-},{}],3:[function(require,module,exports){
 /**
  * Dependencies
  */
@@ -248,16 +213,13 @@ return w[n];},m.exports,m);w[n]=m.exports;};})('gaia-icons',this));
 var Component = require('gaia-component');
 var VideoControls = require('./lib/video_controls');
   
-// Load 'gaia-icons' font-family
-require('gaia-icons');
-
 function toCamelCase(str) {
   return str.replace(/\-(.)/g, function replacer(str, p1) {
     return p1.toUpperCase();
   });
 }
 
-var gaiaMediaControls = Component.register('gaia-media-controls', {
+var gaiaVideoControls = Component.register('gaia-video-controls', {
   /**
    * Called when the element is first created.
    *
@@ -267,15 +229,16 @@ var gaiaMediaControls = Component.register('gaia-media-controls', {
    * @private
    */
   created: function() {
-    console.log('creating gaia-media-controls web component...');
+    console.log('creating gaia-video-controls web component...');
     
     var shadowRoot = this.createShadowRoot();
     shadowRoot.innerHTML = this.template;
 
     var dom = {};
     var ids = [
-        'elapsed-text', 'elapsedTime', 'bufferedTime', 'timeBackground', 'duration-text',
-        'playHead', 'slider-wrapper', 'seek-backward', 'play', 'seek-forward'
+        'bufferedTime', 'duration-text', 'elapsed-text', 'elapsedTime',
+        'fullscreen-button', 'play', 'playHead', 'seek-backward',
+        'seek-forward', 'slider-wrapper', 'timeBackground'
     ];
 
     console.log('reading dom elements...');
@@ -288,20 +251,12 @@ var gaiaMediaControls = Component.register('gaia-media-controls', {
     console.log('done instantiating VideoControls');
   },
 
-  foo: function() {
-    this.videoControls.foo(); 
+  setPlayerPaused: function(isPaused) {
+    this.videoControls.setPlayerPaused(isPaused);
   },
 
-  enablePlayButton: function() {
-    this.videoControls.enablePlayButton();
-  },
-
-  enablePauseButton: function() {
-    this.videoControls.enablePauseButton();
-  },
-
-  setMediaDurationText: function(duration) {
-    this.videoControls.setMediaDurationText(duration);
+  setVideoDurationText: function(duration) {
+    this.videoControls.setVideoDurationText(duration);
   },
 
   updateSlider: function(player) {
@@ -309,7 +264,7 @@ var gaiaMediaControls = Component.register('gaia-media-controls', {
   },
 
   handleSliderTouchStart: function(event, player) {
-    console.log(Date.now() + '--gaia-media-controls, handleSliderTouchStart begin');
+    console.log(Date.now() + '--gaia-video-controls, handleSliderTouchStart begin');
     console.log(Date.now() + '--event.changedTouches: ' + event.changedTouches);
     console.log(Date.now() + '--player: ' + player);
     console.log(Date.now() + '--Invoking VideoControls to handle touch start event');
@@ -328,26 +283,25 @@ var gaiaMediaControls = Component.register('gaia-media-controls', {
  
   <style>
 
-@font-face {
-	font-family: "gaia-icons";
-	src: url("fonts/gaia-icons.ttf") format("truetype");
-	font-weight: 500;
-	font-style: normal;
-}
-
-[data-icon]:before,
-.ligature-icons {
-	font-family: "gaia-icons";
-	content: attr(data-icon);
-	display: inline-block;
-	font-weight: 500;
-	font-style: normal;
-	text-decoration: inherit;
-	text-transform: none;
-	text-rendering: optimizeLegibility;
-	font-size: 30px;
-	-webkit-font-smoothing: antialiased;
-}
+  @font-face {
+  	font-family: "gaia-icons";
+  	src: url("fonts/gaia-icons.ttf") format("truetype");
+  	font-weight: 500;
+  	font-style: normal;
+  }
+  
+  [data-icon]:before {
+  	font-family: "gaia-icons";
+  	content: attr(data-icon);
+  	display: inline-block;
+  	font-weight: 500;
+  	font-style: normal;
+  	text-decoration: inherit;
+  	text-transform: none;
+  	text-rendering: optimizeLegibility;
+  	font-size: 30px;
+  	-webkit-font-smoothing: antialiased;
+  }
 
   footer {
     background: rgba(0, 0, 0, 0.75);
@@ -575,9 +529,9 @@ var gaiaMediaControls = Component.register('gaia-media-controls', {
   </footer>`
 });
 
-module.exports = gaiaMediaControls;
+module.exports = gaiaVideoControls;
 
-},{"./lib/video_controls":4,"gaia-component":1,"gaia-icons":2}],4:[function(require,module,exports){
+},{"./lib/video_controls":3,"gaia-component":1}],3:[function(require,module,exports){
 /* exported VideoControls */
 'use strict';
 
@@ -594,6 +548,9 @@ var sliderRect;
 function VideoControls(domElements) {
   dom = domElements;
 
+  /*
+  ** Add play/rewind/forward event listeners
+  */
   dom.play.addEventListener('click', handlePlayButtonClick);
   dom.seekForward.addEventListener('click', handleSeekForward);
   dom.seekBackward.addEventListener('click', handleSeekBackward);
@@ -601,35 +558,28 @@ function VideoControls(domElements) {
   videoToolbar.addEventListener('contextmenu', handleStartLongPressing);
   videoToolbar.addEventListener('touchend', handleStopLongPressing);
   
-  console.log('VideoControls constructor -- after first set of listeners');
-
   /*
-  ** Add slider events (slider dragging)
-   */
+  ** Add slider event listeners (slider dragging)
+  */
   dom.sliderWrapper.addEventListener('touchstart', handleSliderTouchStart);
   dom.sliderWrapper.addEventListener('touchmove', handleSliderTouchMove);
   dom.sliderWrapper.addEventListener('touchend', handleSliderTouchEnd);
 
-  console.log('VideoControls constructor -- after second set of listeners');
+  /*
+  ** Finally, the fullscreen button
+  */
+  dom.fullscreenButton.addEventListener('click', handleFullscreenButtonClick);
 
   console.log('end VideoControls constructor');
 }
 
 VideoControls.prototype = {
 
-  foo: function() {
-    console.log('foo foo foo foo foo foo foo foo foo foo foo'); 
+  setPlayerPaused: function(isPaused) {
+    setPlayerPaused(isPaused);
   },
 
-  enablePlayButton: function() {
-    enablePlayButton();
-  },
-
-  enablePauseButton: function() {
-    enablePauseButton();
-  },
-
-  setMediaDurationText: function(duration) {
+  setVideoDurationText: function(duration) {
     dom.durationText.textContent = MediaUtils.formatDuration(duration);
   },
 
@@ -703,6 +653,11 @@ function handleSliderTouchMove(event) {
 function handleSliderTouchEnd(event) {
   window.dispatchEvent(new CustomEvent('slider-touch-end', {detail: event}));
 }
+
+function handleFullscreenButtonClick(event) {
+  window.dispatchEvent(new CustomEvent('fullscreen-button-click', {detail: event}));
+}
+
 /*
 ** End functions dispatching events to app based on clicks of elements owned by
 ** this component.
@@ -711,12 +666,13 @@ function handleSliderTouchEnd(event) {
 /*
 ** "Worker" functions.
 */
-function enablePlayButton() {
-  dom.play.classList.remove('paused');
-}
-
-function enablePauseButton() {
-  dom.play.classList.add('paused');
+function setPlayerPaused(isPaused){
+  if (isPaused) {
+    dom.play.classList.add('paused');
+  } 
+  else {
+    dom.play.classList.remove('paused');
+  }
 }
 
 function updateSlider(player, dragging) {
@@ -837,4 +793,4 @@ function sliderTouchEnd(event, player, pause) {
 module.exports = VideoControls;
 
 
-},{}]},{},[3]);
+},{}]},{},[2]);
