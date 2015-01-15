@@ -3,7 +3,7 @@
  */
 
 var Component = require('gaia-component');
-var VideoControls = require('./lib/video_controls');
+var MediaControls = require('./lib/media_controls');
   
 function toCamelCase(str) {
   return str.replace(/\-(.)/g, function replacer(str, p1) {
@@ -11,7 +11,7 @@ function toCamelCase(str) {
   });
 }
 
-var gaiaVideoControls = Component.register('gaia-video-controls', {
+var gaiaMediaControls = Component.register('gaia-media-controls', {
   /**
    * Called when the element is first created.
    *
@@ -21,7 +21,7 @@ var gaiaVideoControls = Component.register('gaia-video-controls', {
    * @private
    */
   created: function() {
-    console.log('creating gaia-video-controls web component...');
+    console.log('creating gaia-media-controls web component...');
     
     var shadowRoot = this.createShadowRoot();
     shadowRoot.innerHTML = this.template;
@@ -37,32 +37,18 @@ var gaiaVideoControls = Component.register('gaia-video-controls', {
       dom[toCamelCase(name)] = shadowRoot.getElementById(name);
     });
 
-    this.videoControls = new VideoControls(dom);
-    console.log('done instantiating VideoControls');
+    dom.mediaControlsComponent = this;
+
+    this.mediaControls = new MediaControls(dom);
+    console.log('done instantiating MediaControls');
   },
 
-  setPlayerPaused: function(isPaused) {
-    this.videoControls.setPlayerPaused(isPaused);
+  initialize: function(playerElement) {
+    this.mediaControls.initialize(playerElement);
   },
 
-  setVideoDurationText: function(duration) {
-    this.videoControls.setVideoDurationText(duration);
-  },
-
-  updateSlider: function(player) {
-    this.videoControls.updateSlider(player);
-  },
-
-  handleSliderTouchStart: function(event, player) {
-    this.videoControls.sliderTouchStart(event, player);
-  },
-
-  handleSliderTouchMove: function(event, player) {
-    this.videoControls.sliderTouchMove(event, player);
-  },
-
-  handleSliderTouchEnd: function(event, player, pause) {
-    this.videoControls.sliderTouchEnd(event, player, pause);
+  updateSlider: function() {
+    this.mediaControls.updateSlider();
   },
 
   template: `
@@ -315,4 +301,4 @@ var gaiaVideoControls = Component.register('gaia-video-controls', {
   </footer>`
 });
 
-module.exports = gaiaVideoControls;
+module.exports = gaiaMediaControls;

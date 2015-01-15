@@ -211,7 +211,7 @@ return w[n];},m.exports,m);w[n]=m.exports;};})('gaia-component',this));
  */
 
 var Component = require('gaia-component');
-var VideoControls = require('./lib/video_controls');
+var MediaControls = require('./lib/media_controls');
   
 function toCamelCase(str) {
   return str.replace(/\-(.)/g, function replacer(str, p1) {
@@ -219,7 +219,7 @@ function toCamelCase(str) {
   });
 }
 
-var gaiaVideoControls = Component.register('gaia-video-controls', {
+var gaiaMediaControls = Component.register('gaia-media-controls', {
   /**
    * Called when the element is first created.
    *
@@ -229,7 +229,7 @@ var gaiaVideoControls = Component.register('gaia-video-controls', {
    * @private
    */
   created: function() {
-    console.log('creating gaia-video-controls web component...');
+    console.log('creating gaia-media-controls web component...');
     
     var shadowRoot = this.createShadowRoot();
     shadowRoot.innerHTML = this.template;
@@ -241,42 +241,22 @@ var gaiaVideoControls = Component.register('gaia-video-controls', {
         'seek-forward', 'slider-wrapper', 'timeBackground'
     ];
 
-    console.log('reading dom elements...');
     ids.forEach(function createElementRef(name) {
       dom[toCamelCase(name)] = shadowRoot.getElementById(name);
     });
-    console.log('done reading dom elements...');
 
-    this.videoControls = new VideoControls(dom);
-    console.log('done instantiating VideoControls');
+    dom.mediaControlsComponent = this;
+
+    this.mediaControls = new MediaControls(dom);
+    console.log('done instantiating MediaControls');
   },
 
-  setPlayerPaused: function(isPaused) {
-    this.videoControls.setPlayerPaused(isPaused);
+  initialize: function(playerElement) {
+    this.mediaControls.initialize(playerElement);
   },
 
-  setVideoDurationText: function(duration) {
-    this.videoControls.setVideoDurationText(duration);
-  },
-
-  updateSlider: function(player) {
-    this.videoControls.updateSlider(player);
-  },
-
-  handleSliderTouchStart: function(event, player) {
-    console.log(Date.now() + '--gaia-video-controls, handleSliderTouchStart begin');
-    console.log(Date.now() + '--event.changedTouches: ' + event.changedTouches);
-    console.log(Date.now() + '--player: ' + player);
-    console.log(Date.now() + '--Invoking VideoControls to handle touch start event');
-    this.videoControls.sliderTouchStart(event, player);
-  },
-
-  handleSliderTouchMove: function(event, player) {
-    this.videoControls.sliderTouchMove(event, player);
-  },
-
-  handleSliderTouchEnd: function(event, player, pause) {
-    this.videoControls.sliderTouchEnd(event, player, pause);
+  updateSlider: function() {
+    this.mediaControls.updateSlider();
   },
 
   template: `
@@ -529,153 +509,298 @@ var gaiaVideoControls = Component.register('gaia-video-controls', {
   </footer>`
 });
 
-module.exports = gaiaVideoControls;
+module.exports = gaiaMediaControls;
 
-},{"./lib/video_controls":3,"gaia-component":1}],3:[function(require,module,exports){
-/* exported VideoControls */
+},{"./lib/media_controls":4,"gaia-component":1}],3:[function(require,module,exports){
+/* exported ForwardRewindController */
+/* globals pause */
+
+/*
+ * This file is used for forward and rewind funtionality of Gaia Video app.
+ *
+ * If the user taps the forward or rewind icons,
+ * the video will jump forward or back by 10 seconds.
+ *
+ * When the user presses and holds on the forward or rewind icons,
+ * the video time will move foward or back at 10 times the regular speed.
+ */
+
+'use strict';
+var isLongPressing = false;
+var intervalId = null;
+var player = null;
+
+function ForwardRewindController() {
+  console.log('ForwardRewindController constructor');
+}
+
+ForwardRewindController.prototype = {
+
+  init: function(video) {
+    player = video;
+  },
+
+  uninit: function(video) {
+    player = null;
+  },
+
+  handleSeekForward: function() {
+    startFastSeeking(1);
+  },
+
+  handleSeekBackward: function() {
+    startFastSeeking(-1);
+  },
+
+  handleLongPressForward: function() {
+    isLongPressing = true;
+    startFastSeeking(1);
+  },
+
+  handleLongPressBackward: function() {
+    isLongPressing = true;
+    startFastSeeking(-1);
+  },
+
+  handleLongPressStop: function() {
+    stopFastSeeking();
+  },
+};
+
+function startFastSeeking(direction) {
+
+  // direction can be 1 or -1, 1 means forward and -1 means rewind.
+  var offset = direction * 10;
+
+  if (isLongPressing) {
+    intervalId = window.setInterval(function() {
+      seekVideo(player.currentTime + offset);
+    }, 1000);
+  } else {
+    seekVideo(player.currentTime + offset);
+  }
+}
+
+function stopFastSeeking() {
+  if (isLongPressing && intervalId) {
+     window.clearInterval(intervalId);
+     intervalId = null;
+     isLongPressing = false;
+  }
+}
+
+function seekVideo(seekTime) {
+  if (seekTime >= player.duration || seekTime < 0) {
+    if (isLongPressing) {
+      stopFastSeeking();
+    }
+    if (seekTime >= player.duration) {
+      seekTime = player.duration;
+      // If the user tries to seek past the end then pause playback
+      // because otherwise when we get the 'ended' event we'll skip
+      // to the beginning of the movie. Even though we pause, we'll
+      // still get the ended event, but the handler sees that we're
+      // paused and does not skip back to the beginning.
+      pause();
+    }
+    else {
+      seekTime = 0;
+    }
+  }
+
+  player.fastSeek(seekTime);
+}
+
+module.exports = ForwardRewindController;
+
+
+},{}],4:[function(require,module,exports){
+/* exported MediaControls */
 'use strict';
 
 /**
  * Dependencies
  */
-//var MediaUtils = require('./media_utils.js');
+var ForwardRewindController = require('./forward_rewind_controller.js');
 
 var dom = {};
-var touchStartID = null;
-var isPausedWhileDragging;
-var sliderRect;
+var player = null;
+var forwardRewindController;
+ 
+function MediaControls(domElements) {
+  console.log('begin MediaControls constructor');
+  this.name = 'foo';
+  console.log('this: ' + this.name);
 
-function VideoControls(domElements) {
+  this.touchStartID = null;
+  this.isPausedWhileDragging = null;
+  this.dragging = false;
+  this.sliderRect = null;
+  this.endedTimer = null;
+
   dom = domElements;
+  forwardRewindController = new ForwardRewindController();
 
-  /*
-  ** Add play/rewind/forward event listeners
-  */
-  dom.play.addEventListener('click', handlePlayButtonClick);
-  dom.seekForward.addEventListener('click', handleSeekForward);
-  dom.seekBackward.addEventListener('click', handleSeekBackward);
-  var videoToolbar = dom.seekForward.parentElement;
-  videoToolbar.addEventListener('contextmenu', handleStartLongPressing);
-  videoToolbar.addEventListener('touchend', handleStopLongPressing);
-  
-  /*
-  ** Add slider event listeners (slider dragging)
-  */
-  dom.sliderWrapper.addEventListener('touchstart', handleSliderTouchStart);
-  dom.sliderWrapper.addEventListener('touchmove', handleSliderTouchMove);
-  dom.sliderWrapper.addEventListener('touchend', handleSliderTouchEnd);
-
-  /*
-  ** Finally, the fullscreen button
-  */
-  dom.fullscreenButton.addEventListener('click', handleFullscreenButtonClick);
-
-  console.log('end VideoControls constructor');
+  console.log('end MediaControls constructor');
 }
 
-VideoControls.prototype = {
+MediaControls.prototype = {
 
-  setPlayerPaused: function(isPaused) {
-    setPlayerPaused(isPaused);
-  },
+  initialize: function(playerElement) {
+    console.log('initialize, this: ' + this.name);
 
-  setVideoDurationText: function(duration) {
-    dom.durationText.textContent = MediaUtils.formatDuration(duration);
-  },
+    player = playerElement;
+    forwardRewindController.init(player);
 
-  updateSlider: function(player) {
-    updateSlider(player);
-  },
+    /*
+    ** play/rewind/forward events
+    */
+    dom.play.addEventListener('click', handlePlayButtonClick);
+    dom.seekForward.addEventListener('click',
+                                     forwardRewindController.handleSeekForward);
+    dom.seekBackward.addEventListener('click',
+                                     forwardRewindController.handleSeekBackward);
+    var videoToolbar = dom.seekForward.parentElement;
+    videoToolbar.addEventListener('contextmenu', handleStartLongPressing);
+    videoToolbar.addEventListener('touchend', handleStopLongPressing);
 
-  sliderTouchStart: function(event, player) {
-    console.log(Date.now() + '--sliderTouchStart begin'); 
-    console.log(Date.now() + '--event: ' + event);
-    console.log(Date.now() + '--player: ' + player);
-    console.log(Date.now() + '--event.changedTouches: ' + event.changedTouches);
-    console.log(Date.now() + '--passing touch start event to worker function');
-    doSliderTouchStart(event, player);
-  },
+    /*
+    ** slider
+    */
+    dom.sliderWrapper.addEventListener('touchstart', handleSliderTouchStart.bind(this));
+    dom.sliderWrapper.addEventListener('touchmove', handleSliderTouchMove.bind(this));
+    dom.sliderWrapper.addEventListener('touchend', handleSliderTouchEnd.bind(this));
 
-  sliderTouchMove: function(event, player) {
-    sliderTouchMove(event, player);
-  },
+    /*
+    ** The fullscreen button
+    */
+    dom.fullscreenButton.addEventListener('click', handleFullscreenButtonClick);
 
-  sliderTouchEnd: function(event, player, pause) {
-    sliderTouchEnd(event, player, pause);
+    /*
+    ** Media loading
+    */
+    player.addEventListener('loadedmetadata', handleLoadedMetadata);
+
+    /*
+    ** Media player begins playing
+    */
+    player.addEventListener('play', handleMediaPlaying);
+
+    /*
+    ** Media player is paused
+    */
+    player.addEventListener('pause', handleMediaPaused);
+
+    /*
+    ** The current playback time of the media has changed
+    */
+    player.addEventListener('timeupdate', handleMediaTimeUpdated.bind(this));
+
+    /*
+    ** Media player seek operation
+    */
+    player.addEventListener('seeked', handleMediaSeeked.bind(this));//updateVideoControlSlider);
+
+    /*
+    ** Media player playback stopped
+    */ 
+    player.addEventListener('ended', handlePlayerEnded.bind(this));
   }
 };
 
 /*
-** Functions dispatching events to app based on clicks of elements owned by
-** this component.
+** Functions handling events.
 */
 function handlePlayButtonClick() {
-  window.dispatchEvent(new CustomEvent('play-button-click'));
-  console.log('dispatching play-button-click event');
-}
-
-function handleSeekForward() {
-  window.dispatchEvent(new CustomEvent('seek-forward-button-click'));
-  console.log('dispatching seek-forward-button-click event');
-}
-
-function handleSeekBackward() {
-  window.dispatchEvent(new CustomEvent('seek-backward-button-click'));
-  console.log('dispatching seek-backward-button-click event');
+  dom.mediaControlsComponent.dispatchEvent(
+    new CustomEvent('play-button-click'));
 }
 
 function handleStartLongPressing(event) {
 
   if (event.target.id === dom.seekForward.id) {
-    console.log('dispatching longpress-forward-button-click event');
-    window.dispatchEvent(new CustomEvent('longpress-forward-button-click'));
+    forwardRewindController.handleLongPressForward();
   } else if (event.target.id === dom.seekBackward.id) {
-    console.log('dispatching longpress-backward-button-click event');
-    window.dispatchEvent(new CustomEvent('longpress-backward-button-click'));
+    forwardRewindController.handleLongPressBackward();
   } else {
     return;
   }
 }
 
 function handleStopLongPressing(event) {
-  console.log('dispatching longpress-stop event');
-  window.dispatchEvent(new CustomEvent('longpress-stop', event));
-}
-
-function handleSliderTouchStart(event) {
-  window.dispatchEvent(new CustomEvent('slider-touch-start', {detail: event}));
-}
-
-function handleSliderTouchMove(event) {
-  window.dispatchEvent(new CustomEvent('slider-touch-move', {detail: event}));
-}
-
-function handleSliderTouchEnd(event) {
-  window.dispatchEvent(new CustomEvent('slider-touch-end', {detail: event}));
+  forwardRewindController.handleLongPressStop();
 }
 
 function handleFullscreenButtonClick(event) {
-  window.dispatchEvent(new CustomEvent('fullscreen-button-click', {detail: event}));
+  dom.mediaControlsComponent.dispatchEvent(
+    new CustomEvent('fullscreen-button-click', {detail: event}));
+}
+
+function handleMediaPlaying() {
+  dom.play.classList.remove('paused');
+}
+
+function handleMediaPaused() {
+  dom.play.classList.add('paused');
+}
+
+function handleMediaTimeUpdated() {
+  mediaTimeUpdated.call(this);
+}
+
+function handleMediaSeeked() {
+  console.log('seeked event');
+  updateMediaControlSlider.call(this);
+}
+
+function handlePlayerEnded() {
+  console.log('ended event');
+  playerEnded.call(this);
 }
 
 /*
-** End functions dispatching events to app based on clicks of elements owned by
-** this component.
+** End event handling functions.
 */
 
 /*
 ** "Worker" functions.
 */
-function setPlayerPaused(isPaused){
-  if (isPaused) {
-    dom.play.classList.add('paused');
-  } 
+// Update the progress bar and play head as the video plays
+function mediaTimeUpdated() {
+  if (!dom.mediaControlsComponent.hidden) {
+    console.log('updating media control slider');
+    // We can't update a progress bar if we don't know how long
+    // the video is. It is kind of a bug that the <video> element
+    // can't figure this out for ogv videos.
+    if (player.duration === Infinity || player.duration === 0) {
+      return;
+    }
+
+    updateMediaControlSlider.call(this);
+  }
   else {
-    dom.play.classList.remove('paused');
+    console.log('component is hidden, not updating slider...');
+  }
+
+  // Since we don't always get reliable 'ended' events, see if
+  // we've reached the end this way.
+  // See: https://bugzilla.mozilla.org/show_bug.cgi?id=783512
+  // If we're within 1 second of the end of the video, register
+  // a timeout a half a second after we'd expect an ended event.
+  if (!this.endedTimer) {
+    if (!this.dragging && player.currentTime >= player.duration - 1) {
+      var timeUntilEnd = (player.duration - player.currentTime + .5);
+      this.endedTimer = setTimeout(playerEnded, timeUntilEnd * 1000);
+    }
+  } else if (this.dragging && player.currentTime < player.duration - 1) {
+    // If there is a timer set and we drag away from the end, cancel the timer
+    clearTimeout(this.endedTimer);
+    this.endedTimer = null;
   }
 }
 
-function updateSlider(player, dragging) {
+function updateMediaControlSlider() {
+
   // We update the slider when we get a 'seeked' event.
   // Don't do updates while we're seeking because the position we fastSeek()
   // to probably isn't exactly where we requested and we don't want jerky
@@ -692,11 +817,11 @@ function updateSlider(player, dragging) {
   percent += '%';
 
   dom.elapsedText.textContent =
-                  MediaUtils.formatDuration(player.currentTime);
+                  formatDuration(player.currentTime);
   dom.elapsedTime.style.width = percent;
 
   // Don't move the play head if the user is dragging it.
-  if (!dragging) {
+  if (!this.dragging) {
     movePlayHead(percent);
   }
 }
@@ -710,39 +835,65 @@ function movePlayHead(percent) {
   }
 }
 
-/*
-** Function returns true when slider movement has been started.
-**          returns false when slider movement has not been started.
-*/
-function doSliderTouchStart(event, player) {
+function playerEnded() {
+  // Ignore ended events that occur while the user is dragging the slider
+  if (this.dragging) {
+    return;
+  }
+
+  if (this.endedTimer) {
+    clearTimeout(this.endedTimer);
+    this.endedTimer = null;
+  }
+
+  // If we are still playing when this 'ended' event arrives, then the
+  // user played the video all the way to the end, and we skip to the
+  // beginning and pause so it is easy for the user to restart. If we
+  // reach the end because the user fast forwarded or dragged the slider
+  // to the end, then we will have paused the video before we get this
+  // event and in that case we will remain paused at the end of the video.
+  if (!this.paused) {
+    console.log('media played to the end, pausing');
+    player.currentTime = 0;
+    player.pause();
+  }
+}
+
+function handleSliderTouchStart(event) {
+
   // We can't do anything if we don't know our duration
   if (player.duration === Infinity) {
     return false;
   }
 
   // If we have a touch start event, we don't need others.
-  if (null != touchStartID) {
+  if (null != this.touchStartID) {
     return false;
   }
 
-  touchStartID = event.changedTouches[0].identifier;
+  this.dragging = true;
+  this.touchStartID = event.changedTouches[0].identifier;
 
-  isPausedWhileDragging = player.paused;
-
-  // calculate the slider wrapper size for slider dragging.
-  sliderRect = dom.sliderWrapper.getBoundingClientRect();
-
-  if (!isPausedWhileDragging) {
+  // Save the state of whether the media element is paused or not
+  // and if it is not, pause it.
+  if (player.paused) {
+    this.isPausedWhileDragging = true;
+  }
+  else {
+    this.isPausedWhileDragging = false;
     player.pause();
   }
+  
+  // calculate the slider wrapper size for slider dragging.
+  this.sliderRect = dom.sliderWrapper.getBoundingClientRect();
 
-  sliderTouchMove(event);
-
-  return true;
+  handleSliderTouchMove.call(this, event);
 }
 
-function sliderTouchMove(event) {
-  var touch = event.changedTouches.identifiedTouch(touchStartID);
+function handleSliderTouchMove(event) {
+
+  var touch = event.changedTouches.identifiedTouch(this.touchStartID);
+
   // We don't care the event not related to touchStartID
   if (!touch) {
     return;
@@ -750,13 +901,13 @@ function sliderTouchMove(event) {
 
   function getTouchPos() {
     return (navigator.mozL10n.language.direction === 'ltr') ?
-       (touch.clientX - sliderRect.left) :
-       (sliderRect.right - touch.clientX);
+       (touch.clientX - this.sliderRect.left) :
+       (this.sliderRect.right - touch.clientX);
   }
 
-  var touchPos = getTouchPos();
+  var touchPos = getTouchPos.call(this);
 
-  var pos = touchPos / sliderRect.width;
+  var pos = touchPos / this.sliderRect.width;
   pos = Math.max(pos, 0);
   pos = Math.min(pos, 1);
 
@@ -770,27 +921,53 @@ function sliderTouchMove(event) {
   player.fastSeek(player.duration * pos);
 }
 
-function sliderTouchEnd(event, player, pause) {
+function handleSliderTouchEnd(event) {
 
   // We don't care the event not related to touchStartID
-  if (!event.changedTouches.identifiedTouch(touchStartID)) {
+  if (!event.changedTouches.identifiedTouch(this.touchStartID)) {
     return false;
   }
 
-  touchStartID = null;
+  this.dragging = false;
+  this.touchStartID = null;
 
   dom.playHead.classList.remove('active');
 
-  if (player.currentTime === player.duration) {
-    pause();
-  } else if (!isPausedWhileDragging) {
+  // If the media was playing when the user began dragging the slider
+  // (and the slider was not dragged to the end), begin playing the
+  // media.
+  if (!(this.isPausedWhileDragging ||
+        player.currentTime === player.duration)) {
     player.play();
   }
-
-  return true;
 }
 
-module.exports = VideoControls;
+function handleLoadedMetadata() {
+  console.log('setting duration to ' + player.duration);
+  dom.durationText.textContent = formatDuration(player.duration);
+}
+
+function formatDuration(duration) {
+  function padLeft(num, length) {
+    var r = String(num);
+    while (r.length < length) {
+      r = '0' + r;
+    }
+    return r;
+  }
+  
+  duration = Math.round(duration);
+  var minutes = Math.floor(duration / 60);
+  var seconds = duration % 60;
+  if (minutes < 60) {
+    return padLeft(minutes, 2) + ':' + padLeft(seconds, 2);
+  }
+  var hours = Math.floor(minutes / 60);
+  minutes = Math.floor(minutes % 60);
+  return hours + ':' + padLeft(minutes, 2) + ':' + padLeft(seconds, 2);
+}
+
+module.exports = MediaControls;
 
 
-},{}]},{},[2]);
+},{"./forward_rewind_controller.js":3}]},{},[2]);
