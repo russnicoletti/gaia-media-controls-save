@@ -1,234 +1,25 @@
 (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
-;(function(define){define(function(require,exports,module){
-'use strict';
-
-var textContent = Object.getOwnPropertyDescriptor(Node.prototype, 'textContent');
-var removeAttribute = HTMLElement.prototype.removeAttribute;
-var setAttribute = HTMLElement.prototype.setAttribute;
-var noop  = function() {};
-
-/**
- * Detects presence of shadow-dom
- * CSS selectors.
- *
- * @return {Boolean}
- */
-var hasShadowCSS = (function() {
-  var div = document.createElement('div');
-  try { div.querySelector(':host'); return true; }
-  catch (e) { return false; }
-})();
-
-/**
- * Register a new component.
- *
- * @param  {String} name
- * @param  {Object} props
- * @return {constructor}
- * @public
- */
-module.exports.register = function(name, props) {
-  injectGlobalCss(props.globalCss);
-  delete props.globalCSS;
-
-  var proto = Object.assign(Object.create(base), props);
-  var output = extractLightDomCSS(proto.template, name);
-  var _attrs = Object.assign(props.attrs || {}, attrs);
-
-  proto.template = output.template;
-  proto.lightCss = output.lightCss;
-
-  Object.defineProperties(proto, _attrs);
-
-  // Register and return the constructor
-  // and expose `protoytpe` (bug 1048339)
-  var El = document.registerElement(name, { prototype: proto });
-  return El;
-};
-
-var base = Object.assign(Object.create(HTMLElement.prototype), {
-  attributeChanged: noop,
-  attached: noop,
-  detached: noop,
-  created: noop,
-  template: '',
-
-  createdCallback: function() {
-    this.injectLightCss(this);
-    this.created();
-  },
-
-  /**
-   * It is very common to want to keep object
-   * properties in-sync with attributes,
-   * for example:
-   *
-   *   el.value = 'foo';
-   *   el.setAttribute('value', 'foo');
-   *
-   * So we support an object on the prototype
-   * named 'attrs' to provide a consistent
-   * way for component authors to define
-   * these properties. When an attribute
-   * changes we keep the attr[name]
-   * up-to-date.
-   *
-   * @param  {String} name
-   * @param  {String||null} from
-   * @param  {String||null} to
-   */
-  attributeChangedCallback: function(name, from, to) {
-    if (this.attrs && this.attrs[name]) { this[name] = to; }
-    this.attributeChanged(name, from, to);
-  },
-
-  attachedCallback: function() { this.attached(); },
-  detachedCallback: function() { this.detached(); },
-
-  /**
-   * Sets an attribute internally
-   * and externally. This is so that
-   * we can style internal shadow-dom
-   * content.
-   *
-   * @param {String} name
-   * @param {String} value
-   */
-  setAttr: function(name, value) {
-    var internal = this.shadowRoot.firstElementChild;
-    setAttribute.call(internal, name, value);
-    setAttribute.call(this, name, value);
-  },
-
-  /**
-   * Removes an attribute internally
-   * and externally. This is so that
-   * we can style internal shadow-dom
-   * content.
-   *
-   * @param {String} name
-   * @param {String} value
-   */
-  removeAttr: function() {
-    var internal = this.shadowRoot.firstElementChild;
-    removeAttribute.call(internal, name, value);
-    removeAttribute.call(this, name, value);
-  },
-
-  /**
-   * The Gecko platform doesn't yet have
-   * `::content` or `:host`, selectors,
-   * without these we are unable to style
-   * user-content in the light-dom from
-   * within our shadow-dom style-sheet.
-   *
-   * To workaround this, we clone the <style>
-   * node into the root of the component,
-   * so our selectors are able to target
-   * light-dom content.
-   *
-   * @private
-   */
-  injectLightCss: function(el) {
-    if (hasShadowCSS) { return; }
-    this.lightStyle = document.createElement('style');
-    this.lightStyle.setAttribute('scoped', '');
-    this.lightStyle.innerHTML = el.lightCss;
-    el.appendChild(this.lightStyle);
-  }
-});
-
-var attrs = {
-  textContent: {
-    set: function(value) {
-      var node = firstChildTextNode(this);
-      if (node) { node.nodeValue = value; }
-    },
-
-    get: function() {
-      var node = firstChildTextNode(this);
-      return node && node.nodeValue;
-    }
-  }
-};
-
-function firstChildTextNode(el) {
-  for (var i = 0; i < el.childNodes.length; i++) {
-    var node = el.childNodes[i];
-    if (node && node.nodeType === 3) { return node; }
-  }
-}
-
-/**
- * Extracts the :host and ::content rules
- * from the shadow-dom CSS and rewrites
- * them to work from the <style scoped>
- * injected at the root of the component.
- *
- * @return {String}
- */
-function extractLightDomCSS(template, name) {
-  var regex = /(?::host|::content)[^{]*\{[^}]*\}/g;
-  var lightCss = '';
-
-  if (!hasShadowCSS) {
-    template = template.replace(regex, function(match) {
-      lightCss += match.replace(/::content|:host/g, name);
-      return '';
-    });
-  }
-
-  return {
-    template: template,
-    lightCss: lightCss
-  };
-}
-
-/**
- * Some CSS rules, such as @keyframes
- * and @font-face don't work inside
- * scoped or shadow <style>. So we
- * have to put them into 'global'
- * <style> in the head of the
- * document.
- *
- * @param  {String} css
- */
-function injectGlobalCss(css) {
-  if (!css) return;
-  var style = document.createElement('style');
-  style.innerHTML = css;
-  document.head.appendChild(style);
-}
-
-});})(typeof define=='function'&&define.amd?define
-:(function(n,w){'use strict';return typeof module=='object'?function(c){
-c(require,exports,module);}:function(c){var m={exports:{}};c(function(n){
-return w[n];},m.exports,m);w[n]=m.exports;};})('gaia-component',this));
-},{}],2:[function(require,module,exports){
 /**
  * Dependencies
  */
 
-var Component = require('gaia-component');
 var MediaControls = require('./lib/media_controls');
+
+function registerComponent(name, props) {
+  console.log('registering element ' + name);
+
+  var baseElement = Object.create(HTMLElement.prototype);
+  var elemProto = Object.assign(baseElement, props);
   
-function toCamelCase(str) {
-  return str.replace(/\-(.)/g, function replacer(str, p1) {
-    return p1.toUpperCase();
-  });
+  var elem = document.registerElement(name, { prototype: elemProto });
+  return elem;
 }
 
-var gaiaMediaControls = Component.register('gaia-media-controls', {
+var gaiaMediaControls = registerComponent('gaia-media-controls', {
   /**
-   * Called when the element is first created.
-   *
-   * Here we create the shadow-root and
-   * inject our template into it.
-   *
-   * @private
+   * 'createdCallback' is called when the element is first created.
    */
-  created: function() {
+  createdCallback: function() {
     console.log('creating gaia-media-controls web component...');
     
     var shadowRoot = this.createShadowRoot();
@@ -240,6 +31,12 @@ var gaiaMediaControls = Component.register('gaia-media-controls', {
         'fullscreen-button', 'play', 'playHead', 'seek-backward',
         'seek-forward', 'slider-wrapper', 'timeBackground'
     ];
+
+    function toCamelCase(str) {
+      return str.replace(/\-(.)/g, function replacer(str, p1) {
+        return p1.toUpperCase();
+      });
+    }
 
     ids.forEach(function createElementRef(name) {
       dom[toCamelCase(name)] = shadowRoot.getElementById(name);
@@ -511,10 +308,8 @@ var gaiaMediaControls = Component.register('gaia-media-controls', {
 
 module.exports = gaiaMediaControls;
 
-},{"./lib/media_controls":4,"gaia-component":1}],3:[function(require,module,exports){
+},{"./lib/media_controls":3}],2:[function(require,module,exports){
 /* exported ForwardRewindController */
-/* globals pause */
-
 /*
  * This file is used for forward and rewind funtionality of Gaia Video app.
  *
@@ -531,16 +326,15 @@ var intervalId = null;
 var player = null;
 
 function ForwardRewindController() {
-  console.log('ForwardRewindController constructor');
 }
 
 ForwardRewindController.prototype = {
 
-  init: function(video) {
-    player = video;
+  init: function(videoPlayer) {
+    player = videoPlayer;
   },
 
-  uninit: function(video) {
+  uninit: function(videoPlayer) {
     player = null;
   },
 
@@ -601,7 +395,7 @@ function seekVideo(seekTime) {
       // to the beginning of the movie. Even though we pause, we'll
       // still get the ended event, but the handler sees that we're
       // paused and does not skip back to the beginning.
-      pause();
+      player.pause();
     }
     else {
       seekTime = 0;
@@ -614,7 +408,7 @@ function seekVideo(seekTime) {
 module.exports = ForwardRewindController;
 
 
-},{}],4:[function(require,module,exports){
+},{}],3:[function(require,module,exports){
 /* exported MediaControls */
 'use strict';
 
@@ -628,10 +422,6 @@ var player = null;
 var forwardRewindController;
  
 function MediaControls(domElements) {
-  console.log('begin MediaControls constructor');
-  this.name = 'foo';
-  console.log('this: ' + this.name);
-
   this.touchStartID = null;
   this.isPausedWhileDragging = null;
   this.dragging = false;
@@ -640,14 +430,11 @@ function MediaControls(domElements) {
 
   dom = domElements;
   forwardRewindController = new ForwardRewindController();
-
-  console.log('end MediaControls constructor');
 }
 
 MediaControls.prototype = {
 
   initialize: function(playerElement) {
-    console.log('initialize, this: ' + this.name);
 
     player = playerElement;
     forwardRewindController.init(player);
@@ -749,12 +536,10 @@ function handleMediaTimeUpdated() {
 }
 
 function handleMediaSeeked() {
-  console.log('seeked event');
   updateMediaControlSlider.call(this);
 }
 
 function handlePlayerEnded() {
-  console.log('ended event');
   playerEnded.call(this);
 }
 
@@ -768,7 +553,6 @@ function handlePlayerEnded() {
 // Update the progress bar and play head as the video plays
 function mediaTimeUpdated() {
   if (!dom.mediaControlsComponent.hidden) {
-    console.log('updating media control slider');
     // We can't update a progress bar if we don't know how long
     // the video is. It is kind of a bug that the <video> element
     // can't figure this out for ogv videos.
@@ -777,9 +561,6 @@ function mediaTimeUpdated() {
     }
 
     updateMediaControlSlider.call(this);
-  }
-  else {
-    console.log('component is hidden, not updating slider...');
   }
 
   // Since we don't always get reliable 'ended' events, see if
@@ -853,7 +634,6 @@ function playerEnded() {
   // to the end, then we will have paused the video before we get this
   // event and in that case we will remain paused at the end of the video.
   if (!this.paused) {
-    console.log('media played to the end, pausing');
     player.currentTime = 0;
     player.pause();
   }
@@ -943,7 +723,6 @@ function handleSliderTouchEnd(event) {
 }
 
 function handleLoadedMetadata() {
-  console.log('setting duration to ' + player.duration);
   dom.durationText.textContent = formatDuration(player.duration);
 }
 
@@ -970,4 +749,4 @@ function formatDuration(duration) {
 module.exports = MediaControls;
 
 
-},{"./forward_rewind_controller.js":3}]},{},[2]);
+},{"./forward_rewind_controller.js":2}]},{},[1]);

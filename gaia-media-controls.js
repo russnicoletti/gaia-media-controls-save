@@ -2,25 +2,23 @@
  * Dependencies
  */
 
-var Component = require('gaia-component');
 var MediaControls = require('./lib/media_controls');
+
+function registerComponent(name, props) {
+  console.log('registering element ' + name);
+
+  var baseElement = Object.create(HTMLElement.prototype);
+  var elemProto = Object.assign(baseElement, props);
   
-function toCamelCase(str) {
-  return str.replace(/\-(.)/g, function replacer(str, p1) {
-    return p1.toUpperCase();
-  });
+  var elem = document.registerElement(name, { prototype: elemProto });
+  return elem;
 }
 
-var gaiaMediaControls = Component.register('gaia-media-controls', {
+var gaiaMediaControls = registerComponent('gaia-media-controls', {
   /**
-   * Called when the element is first created.
-   *
-   * Here we create the shadow-root and
-   * inject our template into it.
-   *
-   * @private
+   * 'createdCallback' is called when the element is first created.
    */
-  created: function() {
+  createdCallback: function() {
     console.log('creating gaia-media-controls web component...');
     
     var shadowRoot = this.createShadowRoot();
@@ -32,6 +30,12 @@ var gaiaMediaControls = Component.register('gaia-media-controls', {
         'fullscreen-button', 'play', 'playHead', 'seek-backward',
         'seek-forward', 'slider-wrapper', 'timeBackground'
     ];
+
+    function toCamelCase(str) {
+      return str.replace(/\-(.)/g, function replacer(str, p1) {
+        return p1.toUpperCase();
+      });
+    }
 
     ids.forEach(function createElementRef(name) {
       dom[toCamelCase(name)] = shadowRoot.getElementById(name);
