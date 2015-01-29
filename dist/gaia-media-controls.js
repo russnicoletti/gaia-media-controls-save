@@ -50,10 +50,7 @@ var gaiaMediaControls = registerComponent('gaia-media-controls', {
 
   initialize: function(playerElement) {
     this.mediaControls.initialize(playerElement);
-  },
-
-  updateSlider: function() {
-    this.mediaControls.updateSlider();
+    console.log('after initializing mediaControls');
   },
 
   template: `
@@ -321,43 +318,44 @@ module.exports = gaiaMediaControls;
  */
 
 'use strict';
-var isLongPressing = false;
-var intervalId = null;
-var player = null;
 
 function ForwardRewindController() {
+  this.isLongPressing = false;
+  this.intervalId = null;
+  this.player = null;
+  this.pausedAtEndWhilePlaying = false;
 }
 
 ForwardRewindController.prototype = {
 
-  init: function(videoPlayer) {
-    player = videoPlayer;
+  init: function(mediaPlayer) {
+    this.player = mediaPlayer;
   },
 
-  uninit: function(videoPlayer) {
-    player = null;
+  uninit: function(mediaPlayer) {
+    this.player = null;
   },
 
   handleSeekForward: function() {
-    startFastSeeking(1);
+    startFastSeeking.call(this, 1);
   },
 
   handleSeekBackward: function() {
-    startFastSeeking(-1);
+    startFastSeeking.call(this, -1);
   },
 
   handleLongPressForward: function() {
-    isLongPressing = true;
-    startFastSeeking(1);
+    this.isLongPressing = true;
+    startFastSeeking.call(this, 1);
   },
 
   handleLongPressBackward: function() {
-    isLongPressing = true;
-    startFastSeeking(-1);
+    this.isLongPressing = true;
+    startFastSeeking.call(this, -1);
   },
 
   handleLongPressStop: function() {
-    stopFastSeeking();
+    stopFastSeeking.call(this);
   },
 };
 
@@ -366,43 +364,47 @@ function startFastSeeking(direction) {
   // direction can be 1 or -1, 1 means forward and -1 means rewind.
   var offset = direction * 10;
 
-  if (isLongPressing) {
-    intervalId = window.setInterval(function() {
-      seekVideo(player.currentTime + offset);
+  if (this.isLongPressing) {
+    this.intervalId = window.setInterval(function() {
+      seekVideo.call(this, this.player.currentTime + offset);
     }, 1000);
   } else {
-    seekVideo(player.currentTime + offset);
+    seekVideo.call(this, this.player.currentTime + offset);
   }
 }
 
 function stopFastSeeking() {
-  if (isLongPressing && intervalId) {
-     window.clearInterval(intervalId);
-     intervalId = null;
-     isLongPressing = false;
+  if (this.isLongPressing && this.intervalId) {
+     window.clearInterval(this.intervalId);
+     this.intervalId = null;
+     this.isLongPressing = false;
   }
 }
 
 function seekVideo(seekTime) {
-  if (seekTime >= player.duration || seekTime < 0) {
-    if (isLongPressing) {
-      stopFastSeeking();
+  if (seekTime >= this.player.duration || seekTime < 0) {
+    if (this.isLongPressing) {
+      stopFastSeeking.call(this);
     }
-    if (seekTime >= player.duration) {
-      seekTime = player.duration;
-      // If the user tries to seek past the end then pause playback
-      // because otherwise when we get the 'ended' event we'll skip
-      // to the beginning of the movie. Even though we pause, we'll
-      // still get the ended event, but the handler sees that we're
-      // paused and does not skip back to the beginning.
-      player.pause();
+    if (seekTime >= this.player.duration) {
+      seekTime = this.player.duration;
+      // If the user tries to seek past the end of the media while the media
+      // is playing, pause the playback.
+      //
+      // Also, set a flag so the media controls will know the media wasn't
+      // played until the end and therefore does not skip back to the
+      // beginning.
+      if (!this.player.paused) {
+        this.player.pause();
+        this.pausedAtEndWhilePlaying = true;
+      }
     }
     else {
       seekTime = 0;
     }
   }
 
-  player.fastSeek(seekTime);
+  this.player.fastSeek(seekTime);
 }
 
 module.exports = ForwardRewindController;
@@ -417,118 +419,146 @@ module.exports = ForwardRewindController;
  */
 var ForwardRewindController = require('./forward_rewind_controller.js');
 
-var dom = {};
-var player = null;
-var forwardRewindController;
- 
 function MediaControls(domElements) {
+  this.dom = domElements;
   this.touchStartID = null;
   this.isPausedWhileDragging = null;
   this.dragging = false;
   this.sliderRect = null;
   this.endedTimer = null;
-
-  dom = domElements;
-  forwardRewindController = new ForwardRewindController();
+  this.player = null;
+  this.forwardRewindController = new ForwardRewindController();
+  this.touchEndedTime = null;
+  this.playedUntilEnd = false;
 }
 
 MediaControls.prototype = {
 
   initialize: function(playerElement) {
 
-    player = playerElement;
-    forwardRewindController.init(player);
+    this.player = playerElement;
+
+    this.forwardRewindController.init(this.player);
 
     /*
     ** play/rewind/forward events
     */
-    dom.play.addEventListener('click', handlePlayButtonClick);
-    dom.seekForward.addEventListener('click',
-                                     forwardRewindController.handleSeekForward);
-    dom.seekBackward.addEventListener('click',
-                                     forwardRewindController.handleSeekBackward);
-    var videoToolbar = dom.seekForward.parentElement;
-    videoToolbar.addEventListener('contextmenu', handleStartLongPressing);
-    videoToolbar.addEventListener('touchend', handleStopLongPressing);
+    this.dom.play.addEventListener(
+      'click', handlePlayButton.bind(this));
+    this.dom.seekForward.addEventListener(
+      'click', handleSeekForward.bind(this));
+    this.dom.seekBackward.addEventListener(
+      'click', handleSeekBackward.bind(this));
+
+    var videoToolbar = this.dom.seekForward.parentElement;
+    videoToolbar.addEventListener(
+      'contextmenu', handleStartLongPressing.bind(this));
+    videoToolbar.addEventListener(
+      'touchend', handleStopLongPressing.bind(this));
 
     /*
     ** slider
     */
-    dom.sliderWrapper.addEventListener('touchstart', handleSliderTouchStart.bind(this));
-    dom.sliderWrapper.addEventListener('touchmove', handleSliderTouchMove.bind(this));
-    dom.sliderWrapper.addEventListener('touchend', handleSliderTouchEnd.bind(this));
+    var sliderWrapper = this.dom.sliderWrapper;
+    sliderWrapper.addEventListener(
+      'touchstart', handleSliderTouchStart.bind(this));
+    sliderWrapper.addEventListener(
+      'touchmove', handleSliderTouchMove.bind(this));
+    sliderWrapper.addEventListener(
+      'touchend', handleSliderTouchEnd.bind(this));
 
     /*
     ** The fullscreen button
     */
-    dom.fullscreenButton.addEventListener('click', handleFullscreenButtonClick);
+    this.dom.fullscreenButton.addEventListener(
+      'click', handleFullscreenButton.bind(this));
 
     /*
     ** Media loading
     */
-    player.addEventListener('loadedmetadata', handleLoadedMetadata);
+    this.player.addEventListener(
+      'loadedmetadata', handleLoadedMetadata.bind(this));
 
     /*
     ** Media player begins playing
     */
-    player.addEventListener('play', handleMediaPlaying);
+    this.player.addEventListener(
+      'play', handleMediaPlaying.bind(this));
 
     /*
     ** Media player is paused
     */
-    player.addEventListener('pause', handleMediaPaused);
+    this.player.addEventListener(
+      'pause', handleMediaPaused.bind(this));
 
     /*
     ** The current playback time of the media has changed
     */
-    player.addEventListener('timeupdate', handleMediaTimeUpdated.bind(this));
+    this.player.addEventListener(
+      'timeupdate', handleMediaTimeUpdated.bind(this));
 
     /*
     ** Media player seek operation
     */
-    player.addEventListener('seeked', handleMediaSeeked.bind(this));//updateVideoControlSlider);
+    this.player.addEventListener(
+      'seeked', handleMediaSeeked.bind(this));
 
     /*
     ** Media player playback stopped
     */ 
-    player.addEventListener('ended', handlePlayerEnded.bind(this));
+    this.player.addEventListener(
+      'ended', handlePlayerEnded.bind(this));
   }
 };
 
 /*
 ** Functions handling events.
 */
-function handlePlayButtonClick() {
-  dom.mediaControlsComponent.dispatchEvent(
+function handlePlayButton() {
+  this.dom.mediaControlsComponent.dispatchEvent(
     new CustomEvent('play-button-click'));
 }
 
 function handleStartLongPressing(event) {
 
-  if (event.target.id === dom.seekForward.id) {
-    forwardRewindController.handleLongPressForward();
-  } else if (event.target.id === dom.seekBackward.id) {
-    forwardRewindController.handleLongPressBackward();
+  if (event.target.id === this.dom.seekForward.id) {
+    this.forwardRewindController.handleLongPressForward();
+  } else if (event.target.id === this.dom.seekBackward.id) {
+    this.forwardRewindController.handleLongPressBackward();
   } else {
     return;
   }
 }
 
 function handleStopLongPressing(event) {
-  forwardRewindController.handleLongPressStop();
+  this.forwardRewindController.handleLongPressStop();
 }
 
-function handleFullscreenButtonClick(event) {
-  dom.mediaControlsComponent.dispatchEvent(
+function handleFullscreenButton(event) {
+  this.dom.mediaControlsComponent.dispatchEvent(
     new CustomEvent('fullscreen-button-click', {detail: event}));
 }
 
 function handleMediaPlaying() {
-  dom.play.classList.remove('paused');
+  this.dom.play.classList.remove('paused');
 }
 
 function handleMediaPaused() {
-  dom.play.classList.add('paused');
+  this.dom.play.classList.add('paused');
+  // If the paused event comes when the media is at the end,
+  // set our 'played-till-end' flag. The one exception is when
+  // the paused event comes from the forwardRewindController
+  // pausing the media when the forward button was used to seek
+  // to the end while the media was playing. In this case, we
+  // don't consider the media being played until the end.
+  if (this.player.currentTime === this.player.duration) {
+    if (this.forwardRewindController.pausedAtEndWhilePlaying) {
+      this.forwardRewindController.pausedAtEndWhilePlaying = false;
+    }
+    else {
+      this.playedUntilEnd = true;
+    }
+  }
 }
 
 function handleMediaTimeUpdated() {
@@ -552,11 +582,11 @@ function handlePlayerEnded() {
 */
 // Update the progress bar and play head as the video plays
 function mediaTimeUpdated() {
-  if (!dom.mediaControlsComponent.hidden) {
+  if (!this.dom.mediaControlsComponent.hidden) {
     // We can't update a progress bar if we don't know how long
     // the video is. It is kind of a bug that the <video> element
     // can't figure this out for ogv videos.
-    if (player.duration === Infinity || player.duration === 0) {
+    if (this.player.duration === Infinity || this.player.duration === 0) {
       return;
     }
 
@@ -569,11 +599,12 @@ function mediaTimeUpdated() {
   // If we're within 1 second of the end of the video, register
   // a timeout a half a second after we'd expect an ended event.
   if (!this.endedTimer) {
-    if (!this.dragging && player.currentTime >= player.duration - 1) {
-      var timeUntilEnd = (player.duration - player.currentTime + .5);
+    if (!this.dragging && this.player.currentTime >= this.player.duration - 1) {
+      var timeUntilEnd = (this.player.duration - this.player.currentTime + .5);
       this.endedTimer = setTimeout(playerEnded, timeUntilEnd * 1000);
     }
-  } else if (this.dragging && player.currentTime < player.duration - 1) {
+  } else if (this.dragging &&
+             this.player.currentTime < this.player.duration - 1) {
     // If there is a timer set and we drag away from the end, cancel the timer
     clearTimeout(this.endedTimer);
     this.endedTimer = null;
@@ -586,33 +617,32 @@ function updateMediaControlSlider() {
   // Don't do updates while we're seeking because the position we fastSeek()
   // to probably isn't exactly where we requested and we don't want jerky
   // updates
-  if (player.seeking) {
+  if (this.player.seeking) {
     return;
   }
 
-  var percent = (player.currentTime / player.duration) * 100;
+  var percent = (this.player.currentTime / this.player.duration) * 100;
   if (isNaN(percent)) {
     return;
   }
 
   percent += '%';
 
-  dom.elapsedText.textContent =
-                  formatDuration(player.currentTime);
-  dom.elapsedTime.style.width = percent;
+  this.dom.elapsedText.textContent = formatDuration(this.player.currentTime);
+  this.dom.elapsedTime.style.width = percent;
 
   // Don't move the play head if the user is dragging it.
   if (!this.dragging) {
-    movePlayHead(percent);
+    movePlayHead.call(this, percent);
   }
 }
 
 function movePlayHead(percent) {
   if (navigator.mozL10n.language.direction === 'ltr') {
-    dom.playHead.style.left = percent;
+    this.dom.playHead.style.left = percent;
   }
   else {
-    dom.playHead.style.right = percent;
+    this.dom.playHead.style.right = percent;
   }
 }
 
@@ -627,22 +657,16 @@ function playerEnded() {
     this.endedTimer = null;
   }
 
-  // If we are still playing when this 'ended' event arrives, then the
-  // user played the video all the way to the end, and we skip to the
-  // beginning and pause so it is easy for the user to restart. If we
-  // reach the end because the user fast forwarded or dragged the slider
-  // to the end, then we will have paused the video before we get this
-  // event and in that case we will remain paused at the end of the video.
-  if (!this.paused) {
-    player.currentTime = 0;
-    player.pause();
+  if (this.playedUntilEnd) {
+    this.player.currentTime = 0;
+    this.playedUntilEnd = false;
   }
 }
 
 function handleSliderTouchStart(event) {
 
   // We can't do anything if we don't know our duration
-  if (player.duration === Infinity) {
+  if (this.player.duration === Infinity) {
     return false;
   }
 
@@ -656,16 +680,16 @@ function handleSliderTouchStart(event) {
 
   // Save the state of whether the media element is paused or not
   // and if it is not, pause it.
-  if (player.paused) {
+  if (this.player.paused) {
     this.isPausedWhileDragging = true;
   }
   else {
     this.isPausedWhileDragging = false;
-    player.pause();
+    this.player.pause();
   }
   
   // calculate the slider wrapper size for slider dragging.
-  this.sliderRect = dom.sliderWrapper.getBoundingClientRect();
+  this.sliderRect = this.dom.sliderWrapper.getBoundingClientRect();
 
   handleSliderTouchMove.call(this, event);
 }
@@ -695,35 +719,37 @@ function handleSliderTouchMove(event) {
   // Note, however, that we don't update the displayed time until
   // we actually get a 'seeked' event.
   var percent = pos * 100 + '%';
-  dom.playHead.classList.add('active');
-  movePlayHead(percent);
-  dom.elapsedTime.style.width = percent;
-  player.fastSeek(player.duration * pos);
+  this.dom.playHead.classList.add('active');
+  movePlayHead.call(this, percent);
+  this.dom.elapsedTime.style.width = percent;
+  this.player.fastSeek(player.duration * pos);
 }
 
 function handleSliderTouchEnd(event) {
+
+  this.touchEndedTime = Date.now();
 
   // We don't care the event not related to touchStartID
   if (!event.changedTouches.identifiedTouch(this.touchStartID)) {
     return false;
   }
 
-  this.dragging = false;
   this.touchStartID = null;
+  this.dragging = false;
 
-  dom.playHead.classList.remove('active');
+  this.dom.playHead.classList.remove('active');
 
   // If the media was playing when the user began dragging the slider
   // (and the slider was not dragged to the end), begin playing the
   // media.
   if (!(this.isPausedWhileDragging ||
-        player.currentTime === player.duration)) {
-    player.play();
+        this.player.currentTime === this.player.duration)) {
+    this.player.play();
   }
 }
 
 function handleLoadedMetadata() {
-  dom.durationText.textContent = formatDuration(player.duration);
+  this.dom.durationText.textContent = formatDuration(this.player.duration);
 }
 
 function formatDuration(duration) {
@@ -744,6 +770,14 @@ function formatDuration(duration) {
   var hours = Math.floor(minutes / 60);
   minutes = Math.floor(minutes % 60);
   return hours + ':' + padLeft(minutes, 2) + ':' + padLeft(seconds, 2);
+}
+
+function handleSeekForward() {
+  this.forwardRewindController.handleSeekForward();
+}
+
+function handleSeekBackward() {
+  this.forwardRewindController.handleSeekBackward();
 }
 
 module.exports = MediaControls;

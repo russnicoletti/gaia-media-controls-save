@@ -49,10 +49,7 @@ var gaiaMediaControls = registerComponent('gaia-media-controls', {
 
   initialize: function(playerElement) {
     this.mediaControls.initialize(playerElement);
-  },
-
-  updateSlider: function() {
-    this.mediaControls.updateSlider();
+    console.log('after initializing mediaControls');
   },
 
   template: `
