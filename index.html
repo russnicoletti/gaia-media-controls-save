@@ -32,6 +32,7 @@
     // ensure controls element is fully instantiated before initializing
     // and that controls are initialized before loading the video
     window.setTimeout(function() {
+        console.log(Date.now() + '--' + ' invoking \'initialize\' on controls');
         controls.initialize(player);
         player.preload = 'metadata';
         player.onloadedmetadata = onLoadedMetadata;
