@@ -5,7 +5,7 @@ var Component = require('gaia-component');
 
 var isDevice = null;
 var mediaPlayer = null;
-var mockTouchEvent = null;
+var mockTouch = null;
 
 var MediaControls = Component.register('gaia-media-controls', {
   /**
@@ -599,7 +599,11 @@ function handleMouseDown(event) {
 
   var mockTouchId = Date.now();
 
-  mockTouchEvent = event;
+  // Create the API necessary to mock up a touch event.
+  // The 'identifiedTouch' function needs to return a 'Touch'
+  // object, which corresponds to the event object received
+  // from the mouse event.
+  mockTouch = event;
 	this.mockChangedTouches = { 
     item: function(index) {
  
@@ -616,7 +620,7 @@ function handleMouseDown(event) {
         return;
       }
  
-      return mockTouchEvent;
+      return mockTouch;
     }
   }; 
 
@@ -629,7 +633,7 @@ function handleMouseMove(event) {
     return;
   }
 
-  mockTouchEvent = event;
+  mockTouch = event;
   event.changedTouches = this.mockChangedTouches;
   handleSliderMove.call(this, event);
 }
@@ -680,27 +684,11 @@ function handleSliderMoveStart(event) {
 }
 
 function handleSliderMove(event) {
-  var xPos;
+  var touch = event.changedTouches.identifiedTouch(this.touchStartID);
 
-  // Determine if this is a touch event or a mouse event
-  if (event.changedTouches) {
-    // Ensure this touch movement is the same as the one where the
-    // slider was initially started to move.
-    var touch = event.changedTouches.identifiedTouch(this.touchStartID);
-
-    // We don't care if the event is not related to touchStartID
-    if (!touch) {
-      return;
-    }
-
-    xPos = touch.clientX;
-  }
-  else {
-    if (!this.mouseMoveStart) {
-      return;
-    }
-
-    xPos = event.clientX;
+  // We don't care the event not related to touchStartID
+  if (!touch) {
+    return;
   }
 
   function getTouchPos() {
@@ -711,6 +699,7 @@ function handleSliderMove(event) {
   }
 
   var touchPos = getTouchPos.call(this);
+
   var pos = touchPos / this.sliderRect.width;
   pos = Math.max(pos, 0);
   pos = Math.min(pos, 1);
