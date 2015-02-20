@@ -8,7 +8,7 @@
   <script src="gaia-media-controls.js"></script>
   <style>
 
-    player-container {
+    #player-container {
       top: 0;
       bottom: 0;
       width: 100%;
@@ -19,29 +19,15 @@
 </head>
 
 <body>
-
-  <div id="player-container">
-    <video src="about:blank" id="player"></video>
-    <gaia-media-controls id="media-controls"></gaia-media-controls>
-  </div>
+    <gaia-media-controls id="media-controls">
+      <div id="video-container">
+        <video src="http://videos-cdn.mozilla.net/serv/webmademovies/Moz_Doc_0329_GetInvolved_ST.webm" id="media-player" autoplay="true"></video>
+      </div>
+    </gaia-media-controls>
 
   <script> 
     var controls = document.getElementById('media-controls');
-    var player = document.getElementById('player');
-
-    // ensure controls element is fully instantiated before initializing
-    // and that controls are initialized before loading the video
-    window.setTimeout(function() {
-        console.log(Date.now() + '--' + ' invoking \'initialize\' on controls');
-        controls.initialize(player);
-        player.preload = 'metadata';
-        player.onloadedmetadata = onLoadedMetadata;
-        player.src = 'http://videos-cdn.mozilla.net/serv/webmademovies/Moz_Doc_0329_GetInvolved_ST.webm';
-      }, 100); 
-
-    function onLoadedMetadata() {
-      player.play();
-    }
+    var player = document.getElementById('media-player');
 
     controls.addEventListener('play-button-click', function() {
       if (player.paused) {

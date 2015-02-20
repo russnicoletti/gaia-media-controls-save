@@ -5,6 +5,7 @@ var Component = require('gaia-component');
 
 var isDevice = null;
 var mediaPlayer = null;
+var mockTouchEvent = null;
 
 var MediaControls = Component.register('gaia-media-controls', {
   /**
@@ -32,11 +33,8 @@ var MediaControls = Component.register('gaia-media-controls', {
       dom[toCamelCase(name)] = shadowRoot.getElementById(name);
     });
 
-    this.mediaControlsImpl = new MediaControlsImpl(dom, this);
-  },
-
-  initialize: function(playerElement) {
-    this.mediaControlsImpl.initialize(playerElement);
+    var mediaPlayerElement = this.querySelectorAll('#media-player');
+    this.mediaControlsImpl = new MediaControlsImpl(dom, mediaPlayerElement[0], this);
   },
 
   template: `
@@ -76,9 +74,7 @@ var MediaControls = Component.register('gaia-media-controls', {
   /* video bar -- duration, time slider, elapsed time */
   #videoBar {
     position: absolute;
-    right: 0;
     bottom: 4.4rem;
-    left: 0;
     height: 4rem;
     font-size: 0;
     border-bottom: 0.1rem solid rgba(255,255,255, 0.1);
@@ -87,9 +83,40 @@ var MediaControls = Component.register('gaia-media-controls', {
     z-index: 10;
   }
 
+  /* Support for web-based demo */
+/*
+  @media screen and (min-width: 600px) and (max-width: 2000px) {
+    footer {
+      left: 25%;
+      right: 25%;
+      bottom: 25%;
+    }
+    #videoBar {
+      bottom: calc(25% + 4.4rem);
+    }
+  }
+*/
   #videoBar:last-child {
     bottom: 0;
   }
+
+::content #video-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+::content #media-player {
+  /* size and position are set in JS depending on*/
+  /* video size and screen orientation */
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  z-index: 11;
+}
 
   #elapsed-text,
   #timeSlider,
@@ -279,6 +306,7 @@ var MediaControls = Component.register('gaia-media-controls', {
 
   </style>
 
+  <content select="#video-container"></content>
   <footer id="videoBar">
     <div id="timeSlider">
       <span id="elapsed-text"></span>
@@ -306,7 +334,10 @@ exports.MediaControls = MediaControls;
 /*
 ** MediaControlsImpl object
 */
-function MediaControlsImpl(domElements, mediaControlsElement) {
+function MediaControlsImpl(domElements, mediaPlayerElement, mediaControlsElement) {
+  mediaPlayerElement.foo = 'bar';
+  console.log(Date.now() + '--' + ' MediaControlsImpl, mediaPlayerElement.foo: ' + mediaPlayerElement.foo);
+
   this.mediaControlsElement = mediaControlsElement;
   this.dom = domElements;
   this.touchStartID = null;
@@ -318,12 +349,13 @@ function MediaControlsImpl(domElements, mediaControlsElement) {
   this.playedUntilEnd = false;
   this.mouseMoveStart = false;
 
+  mediaPlayer = mediaPlayerElement;
+
   isDevice = (this.dom.sliderWrapper.clientWidth <= 200);
+  addEventListeners.call(this);
 }
 
-MediaControlsImpl.prototype.initialize = function(playerElement) {
-
-  mediaPlayer = playerElement;
+function addEventListeners() {
 
   /*
   ** play/rewind/forward events
@@ -354,15 +386,15 @@ MediaControlsImpl.prototype.initialize = function(playerElement) {
   sliderWrapper.addEventListener(
     'touchstart', handleSliderMoveStart.bind(this));
   sliderWrapper.addEventListener(
-    'mousedown', handleSliderMoveStart.bind(this));
+    'mousedown', handleMouseDown.bind(this));
   sliderWrapper.addEventListener(
     'touchmove', handleSliderMove.bind(this));
   sliderWrapper.addEventListener(
-    'mousemove', handleSliderMove.bind(this));
+    'mousemove', handleMouseMove.bind(this));
   sliderWrapper.addEventListener(
     'touchend', handleSliderMoveEnd.bind(this));
   sliderWrapper.addEventListener(
-    'mouseup', handleSliderMoveEnd.bind(this));
+    'mouseup', handleMouseUp.bind(this));
 
   /*
   ** The fullscreen button
@@ -411,6 +443,7 @@ MediaControlsImpl.prototype.initialize = function(playerElement) {
 ** Functions handling events.
 */
 function handlePlayButton() {
+  console.log('handlePlayButton');
   this.mediaControlsElement.dispatchEvent(
     new CustomEvent('play-button-click'));
 }
@@ -432,11 +465,15 @@ function handleFullscreenButton(event) {
 }
 
 function handleMediaPlaying() {
+  console.log('handleMediaPlaying');
+
   this.dom.play.classList.remove('paused');
   this.dom.play.setAttribute('data-l10n-id', 'playbackPlay');
 }
 
 function handleMediaPaused() {
+  console.log('handleMediaPaused');
+
   this.dom.play.classList.add('paused');
   this.dom.play.setAttribute('data-l10n-id', 'playbackPause');
 
@@ -553,28 +590,71 @@ function playerEnded() {
   }
 }
 
+function handleMouseDown(event) {
+  // This is a mouse down event. If we've already had a mouse down
+  // event, we don't need others.
+  if (this.mockChangedTouches) {
+    return;
+  }
+
+  var mockTouchId = Date.now();
+
+  mockTouchEvent = event;
+	this.mockChangedTouches = { 
+    item: function(index) {
+ 
+      if (index !== 0) {
+        return;
+      }
+ 
+      var touchItem = { 'identifier' : mockTouchId };
+      return touchItem;
+    },
+
+    identifiedTouch: function(touchIdentifier) {
+      if (touchIdentifier !== mockTouchId) {
+        return;
+      }
+ 
+      return mockTouchEvent;
+    }
+  }; 
+
+  event.changedTouches = this.mockChangedTouches;
+  handleSliderMoveStart.call(this, event);
+}
+
+function handleMouseMove(event) {
+  if (!this.mockChangedTouches) {
+    return;
+  }
+
+  mockTouchEvent = event;
+  event.changedTouches = this.mockChangedTouches;
+  handleSliderMove.call(this, event);
+}
+
+function handleMouseUp(event) {
+  if (!this.mockChangedTouches) {
+    return;
+  }
+
+  event.changedTouches = this.mockChangedTouches;
+  handleSliderMoveEnd.call(this, event);
+  this.mockChangedTouches = null;
+}
+
+
 function handleSliderMoveStart(event) {
-  // Determine if this is a touch event or a mouse event
-  if (event.changedTouches) {
 
-    // If we already have a touch start event, we don't need others.
-    if (null != this.touchStartID) {
-      return false;
-    }
-
-    // Getting the touch start ID enables us to ensure we are tracking the
-    // same touch throughout the slider movement.
-    this.touchStartID = event.changedTouches[0].identifier;
+  // If we already have a touch start event, we don't need others.
+  if (null != this.touchStartID) {
+    return false;
   }
-  else {
-    // This is a mouse down event. If we've already had a mouse move start
-    // event, we don't need others.
-    if (this.mouseMoveStart) {
-      return;
-    }
 
-    this.mouseMoveStart = true;
-  }
+  // Getting the touch start ID enables us to ensure we are tracking the
+  // same touch throughout the slider movement.
+  this.touchStartID = event.changedTouches.item(0).identifier;
 
   // We can't do anything if we don't know our duration
   if (mediaPlayer.duration === Infinity) {
@@ -647,24 +727,13 @@ function handleSliderMove(event) {
 }
 
 function handleSliderMoveEnd(event) {
-  // Determine if this is a touch event or a mouse event
-  if (event.changedTouches) {
+
     // We don't care the event not related to touchStartID
-    if (!event.changedTouches.identifiedTouch(this.touchStartID)) {
-      return false;
-    }
-
-    this.touchStartID = null;
+  if (!event.changedTouches.identifiedTouch(this.touchStartID)) {
+    return false;
   }
-  else {
-    // This is a mouse up event. If somehow we haven't had a mouse down
-    // event, abort
-    if (!this.mouseMoveStart) {
-      return;
-    }
 
-    this.mouseMoveStart = false;
-  }
+  this.touchStartID = null;
 
   this.dragging = false;
 
@@ -680,6 +749,8 @@ function handleSliderMoveEnd(event) {
 }
 
 function handleLoadedMetadata() {
+  console.log('handleLoadedMetadata');
+
   this.dom.durationText.textContent = formatDuration(mediaPlayer.duration);
 }
 
@@ -713,10 +784,12 @@ function ForwardRewindController() {
 }
 
 ForwardRewindController.prototype.handleSeekForward = function() {
+    console.log('handleSeekForward');
     startFastSeeking.call(this, 1);
 };
 
 ForwardRewindController.prototype.handleSeekBackward = function() {
+    console.log('handleSeekBackward');
     startFastSeeking.call(this, -1);
 };
 
