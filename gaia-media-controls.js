@@ -157,8 +157,14 @@ MediaControlsImpl.prototype.handleLongPressStop = function() {
 };
 
 MediaControlsImpl.prototype.handlePlayButton = function() {
-  this.mediaControlsElement.dispatchEvent(
-    new CustomEvent('play-button-click'));
+  // Let the 'play' and 'pause' handlers take care of changing
+  // the icon and setting the l10n-id (for the screen reader).
+  if (this.mediaPlayer.paused) {
+    this.mediaPlayer.play();
+  }
+  else {
+    this.mediaPlayer.pause();
+  }
 };
 
 MediaControlsImpl.prototype.handleStartLongPressing = function(event) {
@@ -586,7 +592,6 @@ var MediaControls = Component.register('gaia-media-controls', {
   }
 
   /* Support for web-based demo */
-/*
   @media screen and (min-width: 600px) and (max-width: 2000px) {
     footer {
       left: 25%;
@@ -597,7 +602,7 @@ var MediaControls = Component.register('gaia-media-controls', {
       bottom: calc(25% + 4.4rem);
     }
   }
-*/
+
   #video-bar:last-child {
     bottom: 0;
   }
