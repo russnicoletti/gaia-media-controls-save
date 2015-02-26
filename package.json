@@ -13,7 +13,7 @@
   },
   "scripts": {
     "install": "bower install",
-    "build": "mkdir -p dist && browserify gaia-media-controls.js --outfile ./dist/gaia-media-controls.js --standalone VideoControlBar"
+    "build": "mkdir -p dist && browserify gaia-media-controls.js --outfile ./dist/gaia-media-controls.js --standalone GaiaMediaControls"
   },
   "repository": {
     "type": "git",
