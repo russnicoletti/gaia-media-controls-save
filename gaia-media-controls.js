@@ -30,20 +30,25 @@ function MediaControlsImpl(mediaControlsElement, shadowRoot) {
     sliderWrapper: shadowRoot.getElementById('slider-wrapper')
   };
 
+  this.els.videoToolbar = this.els.seekForward.parentElement;
+
   this.isDevice = (this.els.sliderWrapper.clientWidth <= 200);
 
   this.addEventListeners(shadowRoot);
 }
 
 MediaControlsImpl.prototype.addEventListeners = function(shadowRoot) {
-  shadowRoot.addEventListener('click', this);
-  shadowRoot.addEventListener('contextmenu', this);
-  shadowRoot.addEventListener('touchstart', this);
-  shadowRoot.addEventListener('touchend', this);
-  shadowRoot.addEventListener('touchmove', this);
-  shadowRoot.addEventListener('mousedown', this);
-  shadowRoot.addEventListener('mouseup', this);
-  shadowRoot.addEventListener('mousemove', this);
+  this.els.videoToolbar.addEventListener('contextmenu', this.handleStartLongPressing.bind(this));
+  this.els.videoToolbar.addEventListener('touchend', this.handleLongPressStop.bind(this));
+  this.els.play.addEventListener('click', this, true);
+  this.els.seekForward.addEventListener('click', this, true);
+  this.els.seekBackward.addEventListener('click', this, true);
+  this.els.sliderWrapper.addEventListener('touchstart', this, true);
+  this.els.sliderWrapper.addEventListener('touchmove', this, true);
+  this.els.sliderWrapper.addEventListener('touchend', this, true);
+  this.els.sliderWrapper.addEventListener('mousedown', this, true);
+  this.els.sliderWrapper.addEventListener('mouseup', this, true);
+  this.els.sliderWrapper.addEventListener('mousemove', this, true);
   
   this.mediaPlayer.addEventListener('loadedmetadata', this.handleMediaEvent.bind(this));
   this.mediaPlayer.addEventListener('play', this.handleMediaEvent.bind(this));
@@ -55,33 +60,52 @@ MediaControlsImpl.prototype.addEventListeners = function(shadowRoot) {
 
 MediaControlsImpl.prototype.handleEvent = function(e) {
 
-  var videoToolbar = this.els.seekForward.parentElement;
-
   switch(e.target) {
     case this.els.play:
       if (e.type === 'click') {
+        console.log('play button click');
         this.handlePlayButton();
       }
     break;
     case this.els.seekForward:
+      console.log(Date.now() + '--' + ' seekForward event, type: ' + e.type);
       if (e.type === 'click') {
         this.handleSeekForward();
       }
+      else if (e.type === 'contextmenu') {
+        this.handleStartLongPressing(e);
+      }
+      else if (e.type === 'touchend') {
+        console.log('got touch end on seek-forward, calling handleLongPressStop');
+        this.handleLongPressStop();
+      }
     break;
     case this.els.seekBackward:
+      console.log('seekForward event, type: ' + e.type);
       if (e.type === 'click') {
         this.handleSeekBackward();
       }
+      else if (e.type === 'contextmenu') {
+        this.handleStartLongPressing(e);
+      }
+      else if (e.type === 'touchend') {
+        console.log('got touch end on seek-backward, calling handleLongPressStop');
+        this.handleLongPressStop();
+      }
     break;
-    case videoToolbar:
+    case this.els.videoToolbar:
+      console.log('videoToolbar event, type: ' + e.type);
       if (e.type === 'contextmenu') {
         this.handleStartLongPressing(e);
       }
       else if (e.type === 'touchend') {
+        console.log('got touch end on videoToolBar, calling handleLongPressStop');
         this.handleLongPressStop();
       }
-    break;
+      break;
     case this.els.sliderWrapper:
+      console.log('sliderWrapper event, type: ' + e.type);
+
       switch(e.type) {
         case 'touchstart':
           this.handleSliderMoveStart(e);
@@ -142,20 +166,6 @@ MediaControlsImpl.prototype.handleSeekBackward = function() {
   this.startFastSeeking(-1);
 };
 
-MediaControlsImpl.prototype.handleLongPressForward = function() {
-  this.isLongPressing = true;
-  this.startFastSeeking(1);
-};
-
-MediaControlsImpl.prototype.handleLongPressBackward = function() {
-  this.isLongPressing = true;
-  this.startFastSeeking(-1);
-};
-
-MediaControlsImpl.prototype.handleLongPressStop = function() {
-  this.stopFastSeeking();
-};
-
 MediaControlsImpl.prototype.handlePlayButton = function() {
   // Let the 'play' and 'pause' handlers take care of changing
   // the icon and setting the l10n-id (for the screen reader).
@@ -168,6 +178,7 @@ MediaControlsImpl.prototype.handlePlayButton = function() {
 };
 
 MediaControlsImpl.prototype.handleStartLongPressing = function(event) {
+  console.log('handleStartLongPressing, event.target.id: ' + event.target.id);
 
   if (event.target.id === this.els.seekForward.id) {
     this.handleLongPressForward();
@@ -176,6 +187,23 @@ MediaControlsImpl.prototype.handleStartLongPressing = function(event) {
   } else {
     return;
   }
+};
+
+MediaControlsImpl.prototype.handleLongPressForward = function() {
+  console.log('handleLongPressForward');
+  this.isLongPressing = true;
+  this.startFastSeeking(1);
+};
+
+MediaControlsImpl.prototype.handleLongPressBackward = function() {
+  console.log('handleLongPressBackward');
+  this.isLongPressing = true;
+  this.startFastSeeking(-1);
+};
+
+MediaControlsImpl.prototype.handleLongPressStop = function() {
+  console.log('handleLongPressStop');
+  this.stopFastSeeking();
 };
 
 MediaControlsImpl.prototype.handleMediaPlaying = function() {
@@ -338,7 +366,7 @@ MediaControlsImpl.prototype.handleMouseDown = function(event) {
     setMockTouch: function(mt) {
       mockTouch = mt;
     }
-  }; 
+  };
 
   var mockTouchId = Date.now();
   this.mockChangedTouches.setMockTouch(event);
@@ -481,17 +509,29 @@ MediaControlsImpl.prototype.startFastSeeking = function(direction) {
   // direction can be 1 or -1, 1 means forward and -1 means rewind.
   var offset = direction * 10;
 
-  if (this.isLongPressing) {
-    this.intervalId = window.setInterval(function() {
+  var seekOnInterval = function () {
+      console.log(Date.now() + '--' + ' SEEKING ON INTERVAL to: ' + (this.mediaPlayer.currentTime + offset));
       this.seekVideo(this.mediaPlayer.currentTime + offset);
-    }, 1000);
+  };
+    
+  if (this.isLongPressing) {
+    // If we're already handling a long-press, don't process other
+    // seeking events
+    if (this.intervalId) {
+      console.log('Ignoring event, long-press in progress');
+      return;
+    }
+    this.intervalId = window.setInterval(seekOnInterval.bind(this), 1000);
+    console.log(Date.now() + '--' + ' set interval, intervalId: ' + this.intervalId);
   } else {
     this.seekVideo(this.mediaPlayer.currentTime + offset);
   }
 };
 
 MediaControlsImpl.prototype.stopFastSeeking = function() {
+  console.log('begin stopFastSeeking, isLongPressing: ' + this.isLongPressing + ', intervalId: ' + this.intervalId);
   if (this.isLongPressing && this.intervalId) {
+     console.log('CLEARING INTERVAL!!!!!!!!');
      window.clearInterval(this.intervalId);
      this.intervalId = null;
      this.isLongPressing = false;
@@ -499,6 +539,9 @@ MediaControlsImpl.prototype.stopFastSeeking = function() {
 };
 
 MediaControlsImpl.prototype.seekVideo = function(seekTime) {
+  console.log(Date.now() + '--' + ' seekVideo, seekTime: ' + seekTime);
+  console.log(Date.now() + '--' + ' duration: ' + this.mediaPlayer.duration);
+ 
   if (seekTime >= this.mediaPlayer.duration || seekTime < 0) {
     if (this.isLongPressing) {
       this.stopFastSeeking();
