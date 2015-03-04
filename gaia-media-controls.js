@@ -7,6 +7,7 @@ var Component = require('gaia-component');
 ** MediaControlsImpl object
 */
 function MediaControlsImpl(mediaControlsElement, shadowRoot) {
+  this.shadowRoot = shadowRoot;
   this.mediaControlsElement = mediaControlsElement;
   this.touchStartID = null;
   this.isPausedWhileDragging = null;
@@ -20,31 +21,29 @@ function MediaControlsImpl(mediaControlsElement, shadowRoot) {
   this.mediaPlayer = document.getElementById(mediaControlsElement.mediaPlayerId);
 
   this.els = {
-    durationText: shadowRoot.getElementById('duration-text'),
-    elapsedText: shadowRoot.getElementById('elapsed-text'),
-    elapsedTime: shadowRoot.getElementById('elapsed-time'),
-    play: shadowRoot.getElementById('play'),
-    playHead: shadowRoot.getElementById('playHead'),
-    seekForward: shadowRoot.getElementById('seek-forward'),
-    seekBackward: shadowRoot.getElementById('seek-backward'),
-    sliderWrapper: shadowRoot.getElementById('slider-wrapper')
+    durationText: this.shadowRoot.getElementById('duration-text'),
+    elapsedText: this.shadowRoot.getElementById('elapsed-text'),
+    elapsedTime: this.shadowRoot.getElementById('elapsed-time'),
+    play: this.shadowRoot.getElementById('play'),
+    playHead: this.shadowRoot.getElementById('playHead'),
+    seekForward: this.shadowRoot.getElementById('seek-forward'),
+    seekBackward: this.shadowRoot.getElementById('seek-backward'),
+    sliderWrapper: this.shadowRoot.getElementById('slider-wrapper')
   };
 
   this.isDevice = (this.els.sliderWrapper.clientWidth <= 200);
 
-  this.addEventListeners(shadowRoot);
+  this.addEventListeners();
 }
 
-MediaControlsImpl.prototype.addEventListeners = function(shadowRoot) {
-  shadowRoot.addEventListener('contextmenu', this);
-  shadowRoot.addEventListener('touchend', this);
-  shadowRoot.addEventListener('click', this);
-  shadowRoot.addEventListener('touchstart', this);
-  shadowRoot.addEventListener('touchmove', this);
-  shadowRoot.addEventListener('touchend', this);
-  shadowRoot.addEventListener('mousedown', this);
-  shadowRoot.addEventListener('mousemove', this);
-  shadowRoot.addEventListener('mouseup', this);
+MediaControlsImpl.prototype.addEventListeners = function() {
+  this.shadowRoot.addEventListener('contextmenu', this);
+  this.shadowRoot.addEventListener('touchend', this);
+  this.shadowRoot.addEventListener('click', this);
+  this.shadowRoot.addEventListener('touchstart', this);
+  this.shadowRoot.addEventListener('touchmove', this);
+  this.shadowRoot.addEventListener('touchend', this);
+  this.shadowRoot.addEventListener('mousedown', this);
 
   this.mediaPlayer.addEventListener('loadedmetadata', this);
   this.mediaPlayer.addEventListener('play', this);
@@ -56,86 +55,91 @@ MediaControlsImpl.prototype.addEventListeners = function(shadowRoot) {
 
 MediaControlsImpl.prototype.handleEvent = function(e) {
 
-  switch(e.target) {
-    case this.els.play:
-      if (e.type === 'click') {
+  if (e.type === 'click') {
+    switch(e.target) {
+      case this.els.play:
         this.handlePlayButton();
-      }
-    break;
+        break;
 
-    case this.els.seekForward:
-      if (e.type === 'click') {
+      case this.els.seekForward:
         this.handleSeekForward();
-      }
-      else if (e.type === 'contextmenu') {
-        this.handleStartLongPressing(e);
-      }
-      else if (e.type === 'touchend') {
-        this.handleLongPressStop();
-      }
-    break;
+        break;
 
-    case this.els.seekBackward:
-      if (e.type === 'click') {
+      case this.els.seekBackward:
         this.handleSeekBackward();
+        break;
+    }
+  }
+  else if (e.type === 'contextmenu') {
+    // handleStartLongPressing determines whether the event target is
+    // seekForward or seekBackward and takes the appropriate action.
+    this.handleStartLongPressing(e);
+  }
+  else if (e.target === this.els.sliderWrapper && (e.type === 'touchstart' || e.type === 'mousedown' ||
+           e.type === 'touchmove') ||
+           e.type === 'mousemove') {
+
+    function getClientX(event) {
+      if (event instanceof MouseEvent) {
+        return event.clientX;
       }
-      else if (e.type === 'contextmenu') {
-        this.handleStartLongPressing(e);
+      else if (event instanceof TouchEvent) {
+        return event.changedTouches[0].clientX;
       }
-      else if (e.type === 'touchend') {
+    }
+
+    switch(e.type) {
+      case 'touchstart':
+      case 'mousedown':
+        if (e.type === 'mousedown') {
+          window.addEventListener('mousemove', this, true);
+          window.addEventListener('mouseup', this, true);
+        }
+
+        this.handleSliderMoveStart(getClientX(e));
+        break;
+
+      case 'touchmove':
+      case 'mousemove':
+        this.handleSliderMove(getClientX(e));
+        break;
+    }
+  }
+  else if (e.type === 'touchend') {
+    switch (e.target) {
+      case this.els.seekForward:
+      case this.els.seekBackward:
         this.handleLongPressStop();
-      }
-    break;
+        break;
+      case this.els.sliderWrapper:
+        this.handleSliderMoveEnd();
+        break;
+    }
+  }
+  else if (e.type === 'mouseup') {
+    this.handleSliderMoveEnd();
 
-    case this.els.sliderWrapper:
-
-      function getClientX(event) {
-        if (event instanceof MouseEvent) {
-          return event.clientX;
-        }
-        else if (event instanceof TouchEvent) {
-          return event.changedTouches[0].clientX;
-        }
-      }
-
-      switch(e.type) {
-        case 'touchstart':
-        case 'mousedown':
-          this.handleSliderMoveStart(getClientX(e));
-          break;
-        case 'touchmove':
-        case 'mousemove':
-          this.handleSliderMove(getClientX(e));
-          break;
-        case 'touchend':
-        case 'mouseup':
-          this.handleSliderMoveEnd();
-          break;
-      }
-      break;
-
-      case this.mediaPlayer:
-        switch(e.type) {
-          case 'loadedmetadata':
-            this.handleLoadedMetadata();
-            break;
-          case 'play':
-            this.handleMediaPlaying();
-            break;
-          case 'pause':
-            this.handleMediaPaused();
-            break;
-          case 'timeupdate':
-            this.handleMediaTimeUpdated();
-            break;
-          case 'seeked':
-            this.handleMediaSeeked();
-            break;
-          case 'ended':
-            this.handlePlayerEnded();
-            break;
-        }
-      break;
+    // Don't need to listen for mousemove and mouseup until we get a mousedown
+    window.removeEventListener('mousemove', this, true);
+    window.removeEventListener('mouseup', this, true);
+  }
+  else if (e.type === 'loadedmetadata') {
+    this.handleLoadedMetadata();
+  }
+  else if (e.type === 'play') {
+    this.handleMediaPlaying();
+  }
+  else if (e.type === 'pause') {
+    this.handleMediaPaused();
+  }
+  else if (e.type === 'timeupdate') {
+    this.handleMediaTimeUpdated();
+  }
+  else if (e.type === 'seeked') {
+    this.handleMediaSeeked();
+  }
+  else if (e.type === 'ended') {
+    this.handlePlayerEnded();
   }
 };
 
@@ -304,6 +308,7 @@ MediaControlsImpl.prototype.playerEnded = function() {
 };
 
 MediaControlsImpl.prototype.handleSliderMoveStart = function(clientX) {
+
   // If we already have a touch start event, we don't need others.
   if (this.dragging) {
     return false;
