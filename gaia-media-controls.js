@@ -522,13 +522,14 @@ var MediaControls = Component.register('gaia-media-controls', {
   }
 
   /* video bar -- duration, time slider, elapsed time */
-  #video-bar {
+  #time-slider-bar {
     position: relative;
     height: 4rem;
     font-size: 0;
     border-bottom: 0.1rem solid rgba(255,255,255, 0.1);
     white-space: nowrap;
     z-index: 10;
+    width: 100%;
   }
 
   /* Support for web-based demo */
@@ -538,17 +539,13 @@ var MediaControls = Component.register('gaia-media-controls', {
       right: 25%;
       bottom: 10%;
     }
-    #video-bar {
+    #time-slider-bar {
       bottom: calc(25% + 4.4rem);
     }
   }
 
-  #video-bar:last-child {
-    bottom: 0;
-  }
-
   #elapsed-text,
-  #time-slider,
+  #time-slider-bar,
   #slider-wrapper,
   #duration-text {
     display: inline-block;
@@ -574,13 +571,6 @@ var MediaControls = Component.register('gaia-media-controls', {
     width: 3.8rem;
     padding: 0 1.5rem;
     text-align: center;
-  }
-
-  /* time slider */
-  #time-slider {
-    position: relative;
-    width: 100%;
-    z-index: 10;
   }
 
   #slider-wrapper {
@@ -669,19 +659,14 @@ var MediaControls = Component.register('gaia-media-controls', {
   #video-control-bar {
     opacity: 0.95;
     position: relative;
-    z-index: 10;
-    height: 4.5rem;
-  }
-
-  #video-tool-bar {
-    position: relative;
     height: 4.8rem;
     font-size: 0;
     vertical-align: top;
     border-top: 0.1rem solid rgba(255,255,255, 0.1);
     background-color: #000;
     overflow: hidden;
-    direction: ltr
+    direction: ltr;
+    z-index: 10;
   }
 
   #seek-backward,
@@ -736,24 +721,20 @@ var MediaControls = Component.register('gaia-media-controls', {
   </style>
 
   <div id="media-controls-container">
-    <div id="video-bar">
-      <div id="time-slider">
-        <span id="elapsed-text"></span>
-        <div id="slider-wrapper">
-          <div id="elapsed-time" class="progress"></div>
-          <div id="buffered-time" class="progress"></div>
-          <div id="time-background" class="progress"></div>
-          <button id="playHead"></button>
-        </div>
-        <span id="duration-text"></span>
+    <div id="time-slider-bar">
+      <span id="elapsed-text"></span>
+      <div id="slider-wrapper">
+        <div id="elapsed-time" class="progress"></div>
+        <div id="buffered-time" class="progress"></div>
+        <div id="time-background" class="progress"></div>
+        <button id="playHead"></button>
       </div>
+      <span id="duration-text"></span>
     </div>
     <div id="video-control-bar">
-      <div id="video-tool-bar">
-        <button id="seek-backward" class="player-controls-button" data-icon="skip-back"></button>
-        <button id="play" class="player-controls-button" data-icon="pause"></button>
-        <button id="seek-forward" class="player-controls-button" data-icon="skip-forward"></button>
-      </div>
+      <button id="seek-backward" class="player-controls-button" data-icon="skip-back"></button>
+      <button id="play" class="player-controls-button" data-icon="pause"></button>
+      <button id="seek-forward" class="player-controls-button" data-icon="skip-forward"></button>
     </div>
   </div>`
 });
