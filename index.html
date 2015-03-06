@@ -19,24 +19,11 @@
 </head>
 
 <body>
-    <gaia-media-controls id="media-controls">
-      <div id="video-container">
-        <video src="http://videos-cdn.mozilla.net/serv/webmademovies/Moz_Doc_0329_GetInvolved_ST.webm" id="media-player" autoplay="true"></video>
-      </div>
-    </gaia-media-controls>
 
-  <script> 
-    var controls = document.getElementById('media-controls');
-    var player = document.getElementById('media-player');
+  <div id="player-container">
+    <video src="http://videos-cdn.mozilla.net/serv/webmademovies/Moz_Doc_0329_GetInvolved_ST.webm" id="media-player" autoplay="true"></video>
+    <gaia-media-controls id="media-controls" media-player-id="media-player"></gaia-media-controls>
+  </div>
 
-    controls.addEventListener('play-button-click', function() {
-      if (player.paused) {
-        player.play();
-      }
-      else {
-        player.pause();
-      }
-    });
-  </script> 
 </body>
 </html>

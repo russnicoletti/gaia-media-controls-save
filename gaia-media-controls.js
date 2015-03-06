@@ -13,7 +13,6 @@ function MediaControlsImpl(mediaControlsElement, shadowRoot) {
   this.isPausedWhileDragging = null;
   this.dragging = false;
   this.sliderRect = null;
-  this.endedTimer = null;
   this.playedUntilEnd = false;
   this.isLongPressing = false;
   this.intervalId = null;
@@ -25,13 +24,14 @@ function MediaControlsImpl(mediaControlsElement, shadowRoot) {
     elapsedText: this.shadowRoot.getElementById('elapsed-text'),
     elapsedTime: this.shadowRoot.getElementById('elapsed-time'),
     play: this.shadowRoot.getElementById('play'),
-    playHead: this.shadowRoot.getElementById('playHead'),
+    playHead: this.shadowRoot.getElementById('play-head'),
     seekForward: this.shadowRoot.getElementById('seek-forward'),
     seekBackward: this.shadowRoot.getElementById('seek-backward'),
     sliderWrapper: this.shadowRoot.getElementById('slider-wrapper')
   };
 
-  this.isDevice = (this.els.sliderWrapper.clientWidth <= 200);
+  // FastSeek appears to not work well in the browser...
+  this.useFastSeek = /mobile/i.test(navigator.userAgent);
 
   this.addEventListeners();
 }
@@ -237,23 +237,6 @@ MediaControlsImpl.prototype.handleMediaTimeUpdated = function() {
 
     this.updateMediaControlSlider();
   }
-
-  // Since we don't always get reliable 'ended' events, see if
-  // we've reached the end this way.
-  // See: https://bugzilla.mozilla.org/show_bug.cgi?id=783512
-  // If we're within 1 second of the end of the video, register
-  // a timeout a half a second after we'd expect an ended event.
-  if (!this.endedTimer) {
-    if (!this.dragging && this.mediaPlayer.currentTime >= this.mediaPlayer.duration - 1) {
-      var timeUntilEnd = (this.mediaPlayer.duration - this.mediaPlayer.currentTime + .5);
-      this.endedTimer = setTimeout(this.playerEnded.bind(this), timeUntilEnd * 1000);
-    }
-  } else if (this.dragging &&
-             this.mediaPlayer.currentTime < this.mediaPlayer.duration - 1) {
-    // If there is a timer set and we drag away from the end, cancel the timer
-    clearTimeout(this.endedTimer);
-    this.endedTimer = null;
-  }
 };
 
 MediaControlsImpl.prototype.updateMediaControlSlider = function() {
@@ -294,11 +277,6 @@ MediaControlsImpl.prototype.playerEnded = function() {
   // Ignore ended events that occur while the user is dragging the slider
   if (this.dragging) {
     return;
-  }
-
-  if (this.endedTimer) {
-    clearTimeout(this.endedTimer);
-    this.endedTimer = null;
   }
 
   if (this.playedUntilEnd) {
@@ -469,7 +447,7 @@ MediaControlsImpl.prototype.seekVideo = function(seekTime) {
 };
 
 MediaControlsImpl.prototype.moveMediaPlayerPosition = function(pos) {
-  if (this.isDevice) {
+  if (this.useFastSeek) {
     this.mediaPlayer.fastSeek(pos);
   }
   else {
@@ -514,17 +492,17 @@ var MediaControls = Component.register('gaia-media-controls', {
   }
 
   #media-controls-container {
-    position: absolute;
     background-color: rgba(0,0,0, 0.85);
-    left: 0;
-    right: 0;
-    bottom: 0;
+    display: flex;
+    flex-flow: column;
+    align-items: flex-start;
   }
 
   /* video bar -- duration, time slider, elapsed time */
   #time-slider-bar {
-    position: relative;
-    height: 4rem;
+    display: flex;
+    flex-flow: row;
+    justify-content: center;
     font-size: 0;
     border-bottom: 0.1rem solid rgba(255,255,255, 0.1);
     white-space: nowrap;
@@ -535,52 +513,49 @@ var MediaControls = Component.register('gaia-media-controls', {
   /* Support for web-based demo */
   @media screen and (min-width: 600px) and (max-width: 2000px) {
     #media-controls-container {
-      left: 25%;
-      right: 25%;
-      bottom: 10%;
-    }
-    #time-slider-bar {
-      bottom: calc(25% + 4.4rem);
+      width: 50%;
     }
   }
 
   #elapsed-text,
-  #time-slider-bar,
   #slider-wrapper,
   #duration-text {
-    display: inline-block;
-    position: relative;
+    /* The slider elements do not grow and shrink via the flexbox. The slider
+       bar grows and shrinks via the dynamic width of the slider. */
+    flex-grow: 0;
+    flex-shrink: 0;
+
     line-height: 4.2rem;
-    vertical-align: top;
   }
 
+  /* 1. elapsed-text and duration-text have padding on left and right
+        to support ltr and rtl locales */
   #elapsed-text, #duration-text {
     color: #ffffff;
     font-size: 1.4rem;
+    padding: 0 1.5rem; /* 1 */
+    text-align: center;
+    width: 3.8rem;
+    margin-top: 0.3rem;
   }
 
-  /* elapsed-text and duration-text have padding on left and right
-     to support ltr and rtl locales */
   #elapsed-text {
-    width: 3.8rem;
-    padding: 0 1.5rem;
-    text-align: center;
-  }
-
-  #duration-text {
-    width: 3.8rem;
-    padding: 0 1.5rem;
-    text-align: center;
+	  order: 1;
   }
 
   #slider-wrapper {
+    order: 2;
     /* Take into account width and padding of elapsed and duration text */
     width: calc(100% - 13.6rem);
     height: 4.2rem;
   }
 
+  #duration-text {
+	  order: 3;
+  }
+ 
   #slider-wrapper div {
-    position: absolute;
+    position: relative;
     pointer-events: none;
   }
 
@@ -588,13 +563,11 @@ var MediaControls = Component.register('gaia-media-controls', {
     height: 0.3rem;
     width: 0;
     top: 50%;
-    margin-top: -0.1rem;
   }
 
   #elapsed-time {
     background-color: #00caf2;
     z-index: 30;
-    margin-top: -0.2rem;
   }
 
   #buffered-time {
@@ -605,13 +578,13 @@ var MediaControls = Component.register('gaia-media-controls', {
   #time-background {
     width: 100%;
     height: 0.1rem;
+    margin-top: -0.5rem;
     background-color: #a6b4b6;
     z-index: 10;
   }
 
-  #playHead {
-    position: absolute;
-    top: calc(50% - 1.15rem);
+  #play-head {
+    position: relative;
     width: 2.3rem;
     height: 2.3rem;
 
@@ -633,7 +606,7 @@ var MediaControls = Component.register('gaia-media-controls', {
     z-index: 40;
   }
 
-  #playHead:after {
+  #play-head:after {
     content: "";
     position: absolute;
     top: calc(50% - 1.15rem);
@@ -644,7 +617,7 @@ var MediaControls = Component.register('gaia-media-controls', {
     background-color: #fff;
   }
 
-  #playHead.active:before {
+  #play-head.active:before {
     content: "";
     position: absolute;
     top: calc(50% - 3.05rem);
@@ -657,11 +630,13 @@ var MediaControls = Component.register('gaia-media-controls', {
 
   /* video control bar -- rewind, pause/play, forward */
   #video-control-bar {
+    display: flex;
+    flex-flow: row;
+    justify-content: center;
     opacity: 0.95;
-    position: relative;
     height: 4.8rem;
+    width: 100%;
     font-size: 0;
-    vertical-align: top;
     border-top: 0.1rem solid rgba(255,255,255, 0.1);
     background-color: #000;
     overflow: hidden;
@@ -672,8 +647,10 @@ var MediaControls = Component.register('gaia-media-controls', {
   #seek-backward,
   #seek-forward,
   #play {
-    position: relative;
-    height: 100%;
+    /* All three elements grow and shrink together by the same proportion */
+    flex-grow: 1;
+    flex-shrink: 1;
+
     padding: 0;
     font-weight: 500;
     background-position: center center;
@@ -681,14 +658,21 @@ var MediaControls = Component.register('gaia-media-controls', {
     background-size: 3rem;
   }
 
-  #seek-backward,
-  #seek-forward {
+  #seek-backward {
+    order: 1;
     width: 33%;
   }
 
   #play {
+    order: 2;
     width: 34%;
   }
+
+  #seek-forward {
+    order: 3;
+    width: 33%;
+  }
+
 
   #play.paused:before {
     content: 'play';
@@ -727,7 +711,7 @@ var MediaControls = Component.register('gaia-media-controls', {
         <div id="elapsed-time" class="progress"></div>
         <div id="buffered-time" class="progress"></div>
         <div id="time-background" class="progress"></div>
-        <button id="playHead"></button>
+        <button id="play-head"></button>
       </div>
       <span id="duration-text"></span>
     </div>
