@@ -424,7 +424,6 @@ function MediaControlsImpl(mediaControlsElement, shadowRoot) {
 MediaControlsImpl.prototype.addEventListeners = function() {
   this.shadowRoot.addEventListener('contextmenu', this);
   this.shadowRoot.addEventListener('touchend', this);
-  //this.shadowRoot.addEventListener('click', this);
   this.shadowRoot.addEventListener('touchstart', this);
   this.shadowRoot.addEventListener('touchmove', this);
   this.shadowRoot.addEventListener('touchend', this);
@@ -502,15 +501,13 @@ MediaControlsImpl.prototype.handleEvent = function(e) {
           }
 
           var offset = direction * 10;
-          this.seekVideo(this.mediaPlayer.currentTime + offset);
+          this.seekBy(this.mediaPlayer.currentTime + offset);
 
-          // If the user has not stopped the touch or mousedown, begin the
-          // "longpress" movement.
-          var seekOnInterval = function () {
-            this.seekVideo(this.mediaPlayer.currentTime + offset);
-          };
-
-          this.intervalId = window.setInterval(seekOnInterval.bind(this), 1000);
+          // Begin the "longpress" movement after a one second delay.
+          var self = this;
+          this.intervalId = window.setInterval(function() {
+              self.seekBy(self.mediaPlayer.currentTime + offset);
+            }, 1000);
           break;
       }
       break;
@@ -519,7 +516,6 @@ MediaControlsImpl.prototype.handleEvent = function(e) {
       case 'mouseup':
         // If ending a long-press forward or backward, clear timer
         if (this.intervalId) {
-           console.log(Date.now() + '-- clearing intervalId: ' + this.intervalId);
            window.clearInterval(this.intervalId);
            this.intervalId = null;
         }
@@ -539,7 +535,7 @@ MediaControlsImpl.prototype.handleEvent = function(e) {
       //
       // Metadata has been loaded, now we can set the duration of the media
       //
-      this.els.durationText.textContent = this.formatDuration(this.mediaPlayer.duration);
+      this.els.durationText.textContent = this.formatTime(this.mediaPlayer.duration);
       break;
 
     case 'play':
@@ -657,7 +653,7 @@ MediaControlsImpl.prototype.updateMediaControlSlider = function() {
   }
 
   percent += '%';
-  this.els.elapsedText.textContent = this.formatDuration(this.mediaPlayer.currentTime);
+  this.els.elapsedText.textContent = this.formatTime(this.mediaPlayer.currentTime);
   this.els.elapsedTime.style.width = percent;
 
   // Don't move the play head if the user is dragging it.
@@ -733,7 +729,7 @@ MediaControlsImpl.prototype.handleSliderMove = function(clientX) {
   this.movePlayHead(percent);
   this.els.elapsedTime.style.width = percent;
 
-  this.moveMediaPlayerPosition(this.mediaPlayer.duration * pos);
+  this.seekTo(this.mediaPlayer.duration * pos);
 };
 
 MediaControlsImpl.prototype.handleSliderMoveEnd = function(event) {
@@ -751,13 +747,13 @@ MediaControlsImpl.prototype.handleSliderMoveEnd = function(event) {
   // If the media was playing when the user began dragging the slider
   // (and the slider was not dragged to the end), begin playing the
   // media.
-  if (!(this.isPausedWhileDragging ||
-        this.mediaPlayer.currentTime === this.mediaPlayer.duration)) {
+  if (!this.isPausedWhileDragging &&
+      this.mediaPlayer.currentTime !== this.mediaPlayer.duration) {
     this.mediaPlayer.play();
   }
 };
 
-MediaControlsImpl.prototype.formatDuration = function(duration) {
+MediaControlsImpl.prototype.formatTime = function(duration) {
   function padLeft(num, length) {
     var r = String(num);
     while (r.length < length) {
@@ -777,14 +773,17 @@ MediaControlsImpl.prototype.formatDuration = function(duration) {
   return hours + ':' + padLeft(minutes, 2) + ':' + padLeft(seconds, 2);
 };
 
-MediaControlsImpl.prototype.seekVideo = function(seekTime) {
+MediaControlsImpl.prototype.seekBy = function(seekTime) {
   //
   // If seeking will move the media position before the beginning or past
-  // the end, stop the auto-seeking and position the media accordingly.
+  // the end, stop the auto-seeking (if in progress) and position the media
+  // accordingly.
   //
   if (seekTime >= this.mediaPlayer.duration || seekTime < 0) {
-    window.clearInterval(this.intervalId);
-    this.intervalId = null;
+    if (this.intervalId) {
+       window.clearInterval(this.intervalId);
+       this.intervalId = null;
+    }
 
     if (seekTime >= this.mediaPlayer.duration) {
       seekTime = this.mediaPlayer.duration;
@@ -804,10 +803,10 @@ MediaControlsImpl.prototype.seekVideo = function(seekTime) {
     }
   }
 
-  this.moveMediaPlayerPosition(seekTime);
+  this.seekTo(seekTime);
 };
 
-MediaControlsImpl.prototype.moveMediaPlayerPosition = function(pos) {
+MediaControlsImpl.prototype.seekTo = function(pos) {
   if (this.useFastSeek) {
     this.mediaPlayer.fastSeek(pos);
   }
