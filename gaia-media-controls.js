@@ -43,11 +43,12 @@ function MediaControlsImpl(mediaControlsElement, shadowRoot) {
 MediaControlsImpl.prototype.addEventListeners = function() {
   this.shadowRoot.addEventListener('contextmenu', this);
   this.shadowRoot.addEventListener('touchend', this);
-  this.shadowRoot.addEventListener('click', this);
+  //this.shadowRoot.addEventListener('click', this);
   this.shadowRoot.addEventListener('touchstart', this);
   this.shadowRoot.addEventListener('touchmove', this);
   this.shadowRoot.addEventListener('touchend', this);
   this.shadowRoot.addEventListener('mousedown', this);
+  this.shadowRoot.addEventListener('mouseup', this);
 };
 
 MediaControlsImpl.prototype.addMediaPlayerEventListeners = function() {
@@ -70,9 +71,29 @@ MediaControlsImpl.prototype.removeMediaPlayerEventListeners = function() {
 
 MediaControlsImpl.prototype.handleEvent = function(e) {
 
+  // If we get a touchstart, don't process mouse events
+  if (e.type === 'touchstart') {
+    this.shadowRoot.removeEventListener('mousedown', this);
+    this.shadowRoot.removeEventListener('mousemove', this);
+    this.shadowRoot.removeEventListener('mouseup', this);
+  }
+
   switch(e.type) {
 
-    case 'click':
+    case 'mousedown':
+          // The component is listening to window 'mousemove' events so
+          // that the slider movement will function even when the mouse
+          // moves off the play head. However, if the component is always
+          // listening to the window events, it would receive very many
+          // spurious 'mousemove' events. To prevent this, the component
+          // only listens to 'mousemove' events after receiving a 'mousedown'
+          // event.
+          window.addEventListener('mousemove', this, true);
+          window.addEventListener('mouseup', this, true);
+
+          // fall through to touchstart...
+
+    case 'touchstart':
       switch(e.target) {
         case this.els.play:
           //
@@ -88,14 +109,50 @@ MediaControlsImpl.prototype.handleEvent = function(e) {
           break;
 
         case this.els.seekForward:
-          this.seekVideo(this.mediaPlayer.currentTime + this.seekIncrement);
-          break;
-
         case this.els.seekBackward:
-          this.seekVideo(this.mediaPlayer.currentTime - this.seekIncrement);
+
+          var direction = null;
+          if (e.target === this.els.seekForward) {
+            direction = 1;
+          } else if (e.target === this.els.seekBackward) {
+            direction = -1;
+          } else {
+            return;
+          }
+
+          var offset = direction * 10;
+          this.seekVideo(this.mediaPlayer.currentTime + offset);
+
+          // If the user has not stopped the touch or mousedown, begin the
+          // "longpress" movement.
+          var seekOnInterval = function () {
+            this.seekVideo(this.mediaPlayer.currentTime + offset);
+          };
+
+          this.intervalId = window.setInterval(seekOnInterval.bind(this), 1000);
           break;
       }
       break;
+
+      case 'touchend':
+      case 'mouseup':
+        // If ending a long-press forward or backward, clear timer
+        if (this.intervalId) {
+           console.log(Date.now() + '-- clearing intervalId: ' + this.intervalId);
+           window.clearInterval(this.intervalId);
+           this.intervalId = null;
+        }
+        else if (this.dragging) {
+          // If ending a movement of the slider, end slider movement
+          this.handleSliderMoveEnd();
+        }
+
+        if (e.type === 'mouseup') {
+          // Don'listen for mousemove and mouseup until we get a mousedown
+          window.removeEventListener('mousemove', this, true);
+          window.removeEventListener('mouseup', this, true);
+        }
+        break;
 
     case 'loadedmetadata':
       //
@@ -177,34 +234,6 @@ MediaControlsImpl.prototype.handleEvent = function(e) {
         this.playedUntilEnd = false;
       }
       break;
-
-    case 'contextmenu':
-      //
-      // Handle long-press forward or backward
-      //
-      // If we're already handling a long-press, don't process other
-      // seeking events
-      if (this.intervalId) {
-        return;
-      }
-
-      var direction = null;
-
-      if (e.target === this.els.seekForward) {
-        direction = 1;
-      } else if (e.target === this.els.seekBackward) {
-        direction = -1;
-      } else {
-        return;
-      }
-
-      var offset = direction * 10;
-
-      var seekOnInterval = function () {
-          this.seekVideo(this.mediaPlayer.currentTime + offset);
-      };
-
-      this.intervalId = window.setInterval(seekOnInterval.bind(this), 1000);
   }
 
   if (e.target === this.els.sliderWrapper && (e.type === 'touchstart' || e.type === 'mousedown' ||
@@ -236,29 +265,6 @@ MediaControlsImpl.prototype.handleEvent = function(e) {
         this.handleSliderMove(getClientX(e));
         break;
     }
-  }
-  else if (e.type === 'touchend') {
-    switch (e.target) {
-      // If ending a long-press forward or backward, clear timer
-      case this.els.seekForward:
-      case this.els.seekBackward:
-        if (this.intervalId) {
-           window.clearInterval(this.intervalId);
-           this.intervalId = null;
-        }
-        break;
-      // If ending a movement of the slider
-      case this.els.sliderWrapper:
-        this.handleSliderMoveEnd();
-        break;
-    }
-  }
-  else if (e.type === 'mouseup') {
-    this.handleSliderMoveEnd();
-
-    // Don't need to listen for mousemove and mouseup until we get a mousedown
-    window.removeEventListener('mousemove', this, true);
-    window.removeEventListener('mouseup', this, true);
   }
 };
 
@@ -462,7 +468,7 @@ var MediaControls = Component.register('gaia-media-controls', {
    * 'createdCallback' is called when the element is first created.
    */
   created: function() {
-    console.log(Date.now() + '--' + 'creating gaia-media-controls web component...');
+    console.log('creating gaia-media-controls web component...');
 
     var shadowRoot = this.setupShadowRoot();
     this.mediaPlayerId = this.getAttribute('media-player-id');
@@ -758,5 +764,4 @@ var MediaControls = Component.register('gaia-media-controls', {
     </div>
   </div>`
 });
-
 
