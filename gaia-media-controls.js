@@ -264,14 +264,6 @@ MediaControlsImpl.prototype.handleEvent = function(e) {
 
 MediaControlsImpl.prototype.updateMediaControlSlider = function() {
 
-  // We update the slider when we get a 'seeked' event.
-  // Don't do updates while we're seeking because the position we fastSeek()
-  // to probably isn't exactly where we requested and we don't want jerky
-  // updates
-  if (this.mediaPlayer.seeking) {
-    return;
-  }
-
   var percent = (this.mediaPlayer.currentTime / this.mediaPlayer.duration) * 100;
   if (isNaN(percent)) {
     return;
