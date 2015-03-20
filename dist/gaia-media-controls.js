@@ -407,14 +407,14 @@ function MediaControlsImpl(mediaControlsElement, shadowRoot, player) {
   this.mouseEventHandlerRegistered = false;
 
   this.els = {
-    durationText: this.shadowRoot.getElementById('duration-text'),
-    elapsedText: this.shadowRoot.getElementById('elapsed-text'),
-    elapsedTime: this.shadowRoot.getElementById('elapsed-time'),
-    play: this.shadowRoot.getElementById('play'),
-    playHead: this.shadowRoot.getElementById('play-head'),
-    seekForward: this.shadowRoot.getElementById('seek-forward'),
-    seekBackward: this.shadowRoot.getElementById('seek-backward'),
-    sliderWrapper: this.shadowRoot.getElementById('slider-wrapper')
+    durationText: this.shadowRoot.querySelector('.duration-text'),
+    elapsedText: this.shadowRoot.querySelector('.elapsed-text'),
+    elapsedTime: this.shadowRoot.querySelector('.elapsed-time'),
+    play: this.shadowRoot.querySelector('.play'),
+    playHead: this.shadowRoot.querySelector('.play-head'),
+    seekForward: this.shadowRoot.querySelector('.seek-forward'),
+    seekBackward: this.shadowRoot.querySelector('.seek-backward'),
+    sliderWrapper: this.shadowRoot.querySelector('.slider-wrapper')
   };
 
   // FastSeek appears to not work well in the browser...
@@ -891,99 +891,96 @@ var MediaControls = Component.register('gaia-media-controls', {
   	-webkit-font-smoothing: antialiased;
   }
 
-  #media-controls-container {
+  .media-controls-container {
     background-color: rgba(0,0,0, 0.85);
     display: flex;
-    flex-flow: column;
-    align-items: flex-start;
+    flex-direction: column;
+    justify-content: space-around;
+    align-items: stretch;
+    min-width: 30rem;
   }
 
   /* video bar -- duration, time slider, elapsed time */
-  #time-slider-bar {
+  .time-slider-bar {
     display: flex;
     flex-flow: row;
-    justify-content: center;
+    align-items: center;
     font-size: 0;
     border-bottom: 0.1rem solid rgba(255,255,255, 0.1);
     white-space: nowrap;
-    z-index: 10;
-    width: 100%;
   }
 
-  /* Support for web-based demo */
-  @media screen and (min-width: 600px) and (max-width: 2000px) {
-    #media-controls-container {
-      width: 50%;
-    }
-  }
-
-  #elapsed-text,
-  #slider-wrapper,
-  #duration-text {
-    /* The slider elements do not grow and shrink via the flexbox. The slider
-       bar grows and shrinks via the dynamic width of the slider. */
-    flex-grow: 0;
-    flex-shrink: 0;
+  .elapsed-text,
+  .slider-wrapper,
+  .duration-text {
 
     line-height: 4.2rem;
   }
 
   /* 1. elapsed-text and duration-text have padding on left and right
         to support ltr and rtl locales */
-  #elapsed-text, #duration-text {
+  /* 2. The elapsed time and duration elements do not grow and shrink
+        via the flexbox. They are fixed width */
+  .elapsed-text, .duration-text {
     color: #ffffff;
     font-size: 1.4rem;
     padding: 0 1.5rem; /* 1 */
+    flex-grow: 0;      /* 2 */
     text-align: center;
-    width: 3.8rem;
+    flex-basis: 3.8rem;
     margin-top: 0.3rem;
   }
 
-  #elapsed-text {
-	  order: 1;
-  }
 
-  #slider-wrapper {
-    order: 2;
-    /* Take into account width and padding of elapsed and duration text */
-    width: calc(100% - 13.6rem);
+  /* 1. The slider element grows and shrinks via the flexbox */
+  .slider-wrapper {
     height: 4.2rem;
-  }
-
-  #duration-text {
-	  order: 3;
-  }
-
-  #slider-wrapper div {
-    position: relative;
-    pointer-events: none;
+    flex-grow: 1;   /* 1 */
   }
 
   .progress {
-    height: 0.3rem;
+    position: relative;
+    pointer-events: none;
     width: 0;
-    top: 50%;
   }
 
-  #elapsed-time {
-    background-color: #00caf2;
-    z-index: 30;
-  }
-
-  #buffered-time {
-    background-color: blue;
-    z-index: 20;
-  }
-
-  #time-background {
+  /* 1. Move up .2rem in order to be vertically centered
+   *    with respect to elapsed-time (because time-background
+   *    is being positioned below elapsed-time, and elapsed-time
+   *    is .3 rem in height).
+   *    TODO: why is time-background positioned below elapsed-
+   *    time when time-background appears before elapsed-time
+   *    in the markup?
+   *
+   * 2. Ensure the layering order of time background,
+        elapsed time, and play head.
+   */
+  .time-background {
     width: 100%;
     height: 0.1rem;
-    margin-top: -0.5rem;
+    top: calc(50% - .2rem); /* 1 */
     background-color: #a6b4b6;
-    z-index: 10;
+    z-index: 10; /* 2 */
   }
 
-  #play-head {
+  .elapsed-time {
+    height: 0.3rem;
+    background-color: #00caf2;
+    top: 50%;
+    z-index: 20; /* 2 */
+  }
+
+  /*
+   * 1. Center play-head vertically. play-head is positioned
+   *    below elapsed-time, which is .3rem, so it needs to be
+   *    moved up .2rem to be centered vertically relative to
+   *    elapsed-time.
+   *
+   * 2. Ensure the layering order of time background,
+   *    elapsed time, and play head.
+   */
+  .play-head {
+    top: -0.2rem; /* 1 */
     position: relative;
     width: 2.3rem;
     height: 2.3rem;
@@ -1003,10 +1000,16 @@ var MediaControls = Component.register('gaia-media-controls', {
     border: none;
     background: none;
     pointer-events: none;
-    z-index: 40;
+    z-index: 30; /* 2 */
   }
 
-  #play-head:after {
+  /*
+   * Define the 'normal' play-head graphic. Using the 'after' pseudo-element
+   * here specifies that the 'normal' (smaller, white) play-head will
+   * appear on top of the larger, blue 'active' play-head (specified using
+   * the 'before' pseudo-element).
+   */
+  .play-head:after {
     content: "";
     position: absolute;
     top: calc(50% - 1.15rem);
@@ -1017,7 +1020,11 @@ var MediaControls = Component.register('gaia-media-controls', {
     background-color: #fff;
   }
 
-  #play-head.active:before {
+  /* Define the 'active' play-head graphic (blue, larger than the 'normal'
+   * play-head). Using the 'before' pseudo-element specifies that the 'active'
+   * play-head will appear under the 'normal' play-head.
+   */
+  .play-head.active:before {
     content: "";
     position: absolute;
     top: calc(50% - 3.05rem);
@@ -1028,53 +1035,30 @@ var MediaControls = Component.register('gaia-media-controls', {
     background-color: #00CAF2;
   }
 
-  /* video control bar -- rewind, pause/play, forward */
-  #video-control-bar {
+  /* video control bar -- rewind, pause/play, forward
+   *
+   * 1. The buttons should always display left-to-right.
+   */
+  .video-control-bar {
     display: flex;
-    flex-flow: row;
-    justify-content: center;
-    opacity: 0.95;
-    height: 4.8rem;
-    width: 100%;
-    font-size: 0;
+    flex-direction: row;
+    flex-basis: 4.8rem;
     border-top: 0.1rem solid rgba(255,255,255, 0.1);
-    background-color: #000;
+    background-color: rgba(0,0,0, 0.95);
     overflow: hidden;
-    direction: ltr;
-    z-index: 10;
+    direction: ltr; /* 1 */
+    /*z-index: 10*/;
   }
 
-  #seek-backward,
-  #seek-forward,
-  #play {
+  .seek-backward,
+  .seek-forward,
+  .play {
     /* All three elements grow and shrink together by the same proportion */
     flex-grow: 1;
-    flex-shrink: 1;
-
     padding: 0;
-    font-weight: 500;
-    background-position: center center;
-    background-repeat: no-repeat;
-    background-size: 3rem;
   }
 
-  #seek-backward {
-    order: 1;
-    width: 33%;
-  }
-
-  #play {
-    order: 2;
-    width: 34%;
-  }
-
-  #seek-forward {
-    order: 3;
-    width: 33%;
-  }
-
-
-  #play.paused:before {
+  .play.paused:before {
     content: 'play';
     padding-left: 4px;
   }
@@ -1104,21 +1088,20 @@ var MediaControls = Component.register('gaia-media-controls', {
 
   </style>
 
-  <div id="media-controls-container">
-    <div id="time-slider-bar">
-      <span id="elapsed-text"></span>
-      <div id="slider-wrapper">
-        <div id="elapsed-time" class="progress"></div>
-        <div id="buffered-time" class="progress"></div>
-        <div id="time-background" class="progress"></div>
-        <button id="play-head"></button>
+  <div class="media-controls-container">
+    <div class="time-slider-bar">
+      <span class="elapsed-text"></span>
+      <div class="slider-wrapper">
+        <div class="elapsed-time progress"></div>
+        <div class="time-background progress"></div>
+        <button class="play-head"></button>
       </div>
-      <span id="duration-text"></span>
+      <span class="duration-text"></span>
     </div>
-    <div id="video-control-bar">
-      <button id="seek-backward" class="player-controls-button" data-icon="skip-back"></button>
-      <button id="play" class="player-controls-button" data-icon="pause"></button>
-      <button id="seek-forward" class="player-controls-button" data-icon="skip-forward"></button>
+    <div class="video-control-bar">
+      <button class="seek-backward player-controls-button" data-icon="skip-back"></button>
+      <button class="play player-controls-button" data-icon="pause"></button>
+      <button class="seek-forward player-controls-button" data-icon="skip-forward"></button>
     </div>
   </div>`
 });
