@@ -379,6 +379,11 @@ function addDirObserver() {
 c(require,exports,module);}:function(c){var m={exports:{}};c(function(n){
 return w[n];},m.exports,m);w[n]=m.exports;};})('gaia-component',this));
 },{}],2:[function(require,module,exports){
+/*
+ * This wrapping is necessary for the running the tests
+ */
+;(function(define){'use strict';define(function(require,exports,module){
+
 /**
  * Dependencies
  */
@@ -425,7 +430,7 @@ MediaControlsImpl.prototype.addEventListeners = function() {
   this.shadowRoot.addEventListener('touchmove', this);
   this.shadowRoot.addEventListener('touchend', this);
   this.shadowRoot.addEventListener('mousedown', this);
- 
+
   this.mediaPlayer.addEventListener('loadedmetadata', this);
   this.mediaPlayer.addEventListener('play', this);
   this.mediaPlayer.addEventListener('pause', this);
@@ -441,7 +446,7 @@ MediaControlsImpl.prototype.removeEventListeners = function() {
   this.shadowRoot.removeEventListener('touchmove', this);
   this.shadowRoot.removeEventListener('touchend', this);
   this.shadowRoot.removeEventListener('mousedown', this);
- 
+
   this.mediaPlayer.removeEventListener('loadedmetadata', this);
   this.mediaPlayer.removeEventListener('play', this);
   this.mediaPlayer.removeEventListener('pause', this);
@@ -469,18 +474,19 @@ MediaControlsImpl.prototype.handleEvent = function(e) {
   switch(e.type) {
 
     case 'mousedown':
-          // The component is listening to window 'mousemove' events so
-          // that the slider movement will function even when the mouse
-          // moves off the play head. However, if the component is always
-          // listening to the window events, it would receive very many
-          // spurious 'mousemove' events. To prevent this, the component
-          // only listens to 'mousemove' events after receiving a 'mousedown'
-          // event.
-          window.addEventListener('mousemove', this, true);
-          window.addEventListener('mouseup', this, true);
-          this.mouseEventHandlerRegistered = true;
+      //
+      // The component is listening to window 'mousemove' events so
+      // that the slider movement will function even when the mouse
+      // moves off the play head. However, if the component is always
+      // listening to the window events, it would receive very many
+      // spurious 'mousemove' events. To prevent this, the component
+      // only listens to 'mousemove' events after receiving a 'mousedown'
+      // event.
+      window.addEventListener('mousemove', this, true);
+      window.addEventListener('mouseup', this, true);
+      this.mouseEventHandlerRegistered = true;
 
-          // fall through to touchstart...
+      // fall through to touchstart...
 
     case 'touchstart':
       switch(e.target) {
@@ -627,14 +633,8 @@ MediaControlsImpl.prototype.handleEvent = function(e) {
            e.type === 'touchmove') ||
            e.type === 'mousemove') {
 
-    function getClientX(event) {
-      if (event instanceof MouseEvent) {
-        return event.clientX;
-      }
-      else if (event instanceof TouchEvent) {
-        return event.changedTouches[0].clientX;
-      }
-    }
+    var clientX =
+      (/mouse/.test(e.type)) ? e.clientX : e.changedTouches[0].clientX;
 
     switch(e.type) {
       case 'touchstart':
@@ -644,12 +644,12 @@ MediaControlsImpl.prototype.handleEvent = function(e) {
           window.addEventListener('mouseup', this, true);
         }
 
-        this.handleSliderMoveStart(getClientX(e));
+        this.handleSliderMoveStart(clientX);
         break;
 
       case 'touchmove':
       case 'mousemove':
-        this.handleSliderMove(getClientX(e));
+        this.handleSliderMove(clientX);
         break;
     }
   }
@@ -829,12 +829,19 @@ MediaControlsImpl.prototype.unload = function(e) {
   this.removeEventListeners();
 };
 
+MediaControlsImpl.prototype.triggerEvent = function(e) {
+  var event = document.createEvent("MouseEvents");
+  event.initMouseEvent('mousedown', false, false, window, 1, 0, 0, 0, 0, false, false, false, false, 0, null);
+  console.log('dispatching ' + event.type + ' on ' + this.els[this.buttons[e.target]].id);
+  this.els[this.buttons[e.target]].dispatchEvent(event);
+};
+
 var MediaControls = Component.register('gaia-media-controls', {
   /**
    * 'createdCallback' is called when the element is first created.
    */
   created: function() {
-    console.log(Date.now() + '-- creating gaia-media-controls web component...');
+    console.log('creating gaia-media-controls web component...');
   },
 
   attachTo: function(player) {
@@ -844,8 +851,7 @@ var MediaControls = Component.register('gaia-media-controls', {
     }
 
     if (!this.shadowRoot) {
-      this.shadowRoot = this.setupShadowRoot();
-      console.log(Date.now() + '-- created, shadowRoot: ' + this.shadowRoot);
+      this.setupShadowRoot();
     }
     this.mediaControlsImpl = new MediaControlsImpl(this, this.shadowRoot, player);
   },
@@ -855,6 +861,10 @@ var MediaControls = Component.register('gaia-media-controls', {
       this.mediaPlayerImpl.unload();
       this.mediaPlayerImpl = null;
     }
+  },
+
+  triggerEvent: function(event) {
+    this.mediaControlsImpl.triggerEvent(event);
   },
 
   template: `
@@ -1113,5 +1123,9 @@ var MediaControls = Component.register('gaia-media-controls', {
   </div>`
 });
 
+});})(typeof define=='function'&&define.amd?define
+:(function(n,w){'use strict';return typeof module=='object'?function(c){
+c(require,exports,module);}:function(c){var m={exports:{}};c(function(n){
+return w[n];},m.exports,m);w[n]=m.exports;};})('gaia-media-controls',this));
 
 },{"gaia-component":1}]},{},[2]);
