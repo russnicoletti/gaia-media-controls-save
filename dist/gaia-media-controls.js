@@ -907,7 +907,6 @@ var MediaControls = Component.register('gaia-media-controls', {
     align-items: center;
     font-size: 0;
     border-bottom: 0.1rem solid rgba(255,255,255, 0.1);
-    white-space: nowrap;
   }
 
   /* 1. elapsed-text and duration-text have padding on left and right
@@ -917,7 +916,7 @@ var MediaControls = Component.register('gaia-media-controls', {
   .elapsed-text, .duration-text {
     color: #ffffff;
     font-size: 1.4rem;
-    padding: 1.0rem 1.5rem; /* 1 */
+    padding: 0 1.5rem; /* 1 */
     flex-grow: 0;      /* 2 */
     text-align: center;
   }
@@ -925,6 +924,7 @@ var MediaControls = Component.register('gaia-media-controls', {
   /* 1. The slider element grows and shrinks via the flexbox */
   .slider-wrapper {
     flex-grow: 1;   /* 1 */
+    height: 4.2rem;
   }
 
   .progress {
@@ -933,40 +933,47 @@ var MediaControls = Component.register('gaia-media-controls', {
     width: 0;
   }
 
-  /* 1. TODO explain 'top:1.0rem' and 'top:1.2rem'
-   *    TODO: why is time-background positioned below elapsed-
-   *    time when time-background appears before elapsed-time
-   *    in the markup?
+  /* 1. Center elements vertically within time-slider; 'top: 50%' centers the
+   *    top of the element vertically; 'elapsed-time' is the first element
+   *    to be layed out, it is 0.3rem in height, therefore 'top:50%' would
+   *    position the center of the element 0.1rem below the middle: move
+   *    it up 0.1rem to center the middle of the element vertically.
+   *    'time-background' is layed out after 'elapsed-time' and is 0.1rem in
+   *    height. With 'elapsed-time' being 0.3rem in height, 'top:50%' would
+   *    position 'time-background' 0.3rem below the center vertically: move it
+   *    up 0.3rem to center it vertically.
    *
    * 2. Ensure the layering order of time background,
         elapsed time, and play head.
    */
-  .time-background {
-    width: 100%;
-    height: 0.1rem;
-    top: 1.0rem; /* 1 */
-    background-color: #a6b4b6;
-    z-index: 10; /* 2 */
-  }
 
   .elapsed-time {
     height: 0.3rem;
     background-color: #00caf2;
-    top: 1.2rem; /* 1 */
+    top: calc(50% - 0.1rem); /* 1 */
     z-index: 20; /* 2 */
   }
 
+  .time-background {
+    width: 100%;
+    height: 0.1rem;
+    top: calc(50% - 0.3rem); /* 1 */
+    background-color: #a6b4b6;
+    z-index: 10; /* 2 */
+  }
   /*
-   * 1. Center play-head vertically. play-head is positioned
-   *    below elapsed-time, which is .3rem, so it needs to be
-   *    moved up .2rem to be centered vertically relative to
-   *    elapsed-time.
+   * 1. Center 'play-head' vertically. 'top' is relative to the other
+   *    'slider-wrapper' elements which are 0.4rem in height; therefore,
+   *    'top:50%' would position the top of the element 0.4rem below the
+   *    the center of the 'sider-wrapper'. In order to position the center
+   *    of the element vertically, move it up by half its height plus
+   *    the height of the previously layed out elements.
    *
    * 2. Ensure the layering order of time background,
    *    elapsed time, and play head.
    */
   .play-head {
-    top: -0.2rem; /* 1 */
+    top: calc(50% - (1.15rem + 0.4rem));
     position: relative;
     width: 2.3rem;
     height: 2.3rem;
@@ -998,7 +1005,7 @@ var MediaControls = Component.register('gaia-media-controls', {
   .play-head:after {
     content: "";
     position: absolute;
-    top: calc(50% - 1.15rem);
+    top: 0; 
     left: calc(50% - 1.15rem);
     width: 2.3rem;
     height: 2.3rem;
