@@ -910,13 +910,6 @@ var MediaControls = Component.register('gaia-media-controls', {
     white-space: nowrap;
   }
 
-  .elapsed-text,
-  .slider-wrapper,
-  .duration-text {
-
-    line-height: 4.2rem;
-  }
-
   /* 1. elapsed-text and duration-text have padding on left and right
         to support ltr and rtl locales */
   /* 2. The elapsed time and duration elements do not grow and shrink
@@ -924,17 +917,13 @@ var MediaControls = Component.register('gaia-media-controls', {
   .elapsed-text, .duration-text {
     color: #ffffff;
     font-size: 1.4rem;
-    padding: 0 1.5rem; /* 1 */
+    padding: 1.0rem 1.5rem; /* 1 */
     flex-grow: 0;      /* 2 */
     text-align: center;
-    flex-basis: 3.8rem;
-    margin-top: 0.3rem;
   }
-
 
   /* 1. The slider element grows and shrinks via the flexbox */
   .slider-wrapper {
-    height: 4.2rem;
     flex-grow: 1;   /* 1 */
   }
 
@@ -944,10 +933,7 @@ var MediaControls = Component.register('gaia-media-controls', {
     width: 0;
   }
 
-  /* 1. Move up .2rem in order to be vertically centered
-   *    with respect to elapsed-time (because time-background
-   *    is being positioned below elapsed-time, and elapsed-time
-   *    is .3 rem in height).
+  /* 1. TODO explain 'top:1.0rem' and 'top:1.2rem'
    *    TODO: why is time-background positioned below elapsed-
    *    time when time-background appears before elapsed-time
    *    in the markup?
@@ -958,7 +944,7 @@ var MediaControls = Component.register('gaia-media-controls', {
   .time-background {
     width: 100%;
     height: 0.1rem;
-    top: calc(50% - .2rem); /* 1 */
+    top: 1.0rem; /* 1 */
     background-color: #a6b4b6;
     z-index: 10; /* 2 */
   }
@@ -966,7 +952,7 @@ var MediaControls = Component.register('gaia-media-controls', {
   .elapsed-time {
     height: 0.3rem;
     background-color: #00caf2;
-    top: 50%;
+    top: 1.2rem; /* 1 */
     z-index: 20; /* 2 */
   }
 
