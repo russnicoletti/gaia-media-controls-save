@@ -19,6 +19,7 @@ module.exports = function(config) {
     files: [
       'bower_components/gaia-component/gaia-component.js',
       'bower_components/gaia-icons/gaia-icons.js',
+      'lib/media-controls-impl.js',
       'gaia-media-controls.js',
       'test/mock_l10n.js',
       'test/test.js',
