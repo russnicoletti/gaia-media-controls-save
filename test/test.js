@@ -53,7 +53,7 @@ suite('GaiaMediaControls', function() {
     this.mediaControls = document.getElementById('media-controls');
     this.mediaPlayer = document.getElementById('media-player');
     this.mediaControls.attachTo(this.mediaPlayer);
-    this.mediaControls.enableComponentTesting();
+    this.componentTestingHelper = this.mediaControls.enableComponentTesting();
     this.sinon.spy(this.mediaPlayer, 'play');
     this.sinon.spy(this.mediaPlayer, 'pause');
 
@@ -72,14 +72,14 @@ suite('GaiaMediaControls', function() {
 
       return clientRect;
    };
-		HTMLElement.prototype.getBoundingClientRect = mockGetBoundingClientRect;
+   HTMLElement.prototype.getBoundingClientRect = mockGetBoundingClientRect;
   });
 
   teardown(function() {
     this.sinon.restore();
     this.dom.remove();
     this.clock.restore();
-    this.mediaControls.disableComponentTesting();
+    this.componentTestingHelper.disableComponentTesting();
     HTMLElement.prototype.getBoundingClientRect = getBoundingClientRect;
   });
 
@@ -87,17 +87,16 @@ suite('GaiaMediaControls', function() {
 
     this.mediaPlayer.paused = true;
 
-    this.mediaControls.triggerEvent({type: 'mousedown', target: 'play'});
+    this.componentTestingHelper.triggerEvent({type: 'mousedown', target: 'play'});
 
     sinon.assert.calledOnce(this.mediaPlayer.play);
     sinon.assert.notCalled(this.mediaPlayer.pause);
   });
-
   test('play button plays (touch)', function() {
 
     this.mediaPlayer.paused = true;
 
-    this.mediaControls.triggerEvent({type: 'touchstart', target: 'play'});
+    this.componentTestingHelper.triggerEvent({type: 'touchstart', target: 'play'});
 
     sinon.assert.calledOnce(this.mediaPlayer.play);
     sinon.assert.notCalled(this.mediaPlayer.pause);
@@ -107,7 +106,7 @@ suite('GaiaMediaControls', function() {
 
     this.mediaPlayer.paused = false;
 
-    this.mediaControls.triggerEvent({type: 'mousedown', target: 'play'});
+    this.componentTestingHelper.triggerEvent({type: 'mousedown', target: 'play'});
 
     sinon.assert.notCalled(this.mediaPlayer.play);
     sinon.assert.calledOnce(this.mediaPlayer.pause);
@@ -117,7 +116,7 @@ suite('GaiaMediaControls', function() {
 
     this.mediaPlayer.paused = false;
 
-    this.mediaControls.triggerEvent({type: 'touchstart', target: 'play'});
+    this.componentTestingHelper.triggerEvent({type: 'touchstart', target: 'play'});
 
     sinon.assert.notCalled(this.mediaPlayer.play);
     sinon.assert.calledOnce(this.mediaPlayer.pause);
@@ -126,35 +125,35 @@ suite('GaiaMediaControls', function() {
   test('seek-forward (mouse)', function() {
 
     this.mediaPlayer.currentTime = 0;
-    this.mediaControls.triggerEvent({type: 'mousedown', target: 'seek-forward'});
+    this.componentTestingHelper.triggerEvent({type: 'mousedown', target: 'seek-forward'});
     assert.equal(this.mediaPlayer.currentTime, 10);
   });
 
   test('seek-forward (touch)', function() {
 
     this.mediaPlayer.currentTime = 0;
-    this.mediaControls.triggerEvent({type: 'touchstart', target: 'seek-forward'});
+    this.componentTestingHelper.triggerEvent({type: 'touchstart', target: 'seek-forward'});
     assert.equal(this.mediaPlayer.currentTime, 10);
   });
 
   test('seek-backward (mouse)', function() {
 
     this.mediaPlayer.currentTime = 10;
-    this.mediaControls.triggerEvent({type: 'mousedown', target: 'seek-backward'});
+    this.componentTestingHelper.triggerEvent({type: 'mousedown', target: 'seek-backward'});
     assert.equal(this.mediaPlayer.currentTime, 0);
   });
 
   test('seek-backward (touch)', function() {
 
     this.mediaPlayer.currentTime = 10;
-    this.mediaControls.triggerEvent({type: 'touchstart', target: 'seek-backward'});
+    this.componentTestingHelper.triggerEvent({type: 'touchstart', target: 'seek-backward'});
     assert.equal(this.mediaPlayer.currentTime, 0);
   });
 
   test('long press forward (mouse)', function() {
 
     this.mediaPlayer.currentTime = 0;
-    this.mediaControls.triggerEvent({type: 'mousedown', target: 'seek-forward'});
+    this.componentTestingHelper.triggerEvent({type: 'mousedown', target: 'seek-forward'});
 
     // Advance the clock two seconds to simulate the user holding the
     // seek-forward button for two seconds -- player should seek
@@ -167,7 +166,7 @@ suite('GaiaMediaControls', function() {
   test('long press forward (touch)', function() {
 
     this.mediaPlayer.currentTime = 0;
-    this.mediaControls.triggerEvent({type: 'touchstart', target: 'seek-forward'});
+    this.componentTestingHelper.triggerEvent({type: 'touchstart', target: 'seek-forward'});
 
     // Advance the clock two seconds to simulate the user holding the
     // seek-forward button for two seconds -- player should seek
@@ -180,7 +179,7 @@ suite('GaiaMediaControls', function() {
   test('long press backward (mouse)', function() {
 
     this.mediaPlayer.currentTime = 30;
-    this.mediaControls.triggerEvent({type: 'mousedown', target: 'seek-backward'});
+    this.componentTestingHelper.triggerEvent({type: 'mousedown', target: 'seek-backward'});
 
     // Advance the clock two seconds to simulate the user holding the
     // seek-backward button for two seconds -- player should seek
@@ -190,14 +189,14 @@ suite('GaiaMediaControls', function() {
     assert.equal(this.mediaPlayer.currentTime, 0);
 
     this.sinon.spy(window, 'clearInterval');
-    this.mediaControls.triggerEvent({type: 'mouseup', target: 'seek-backward'});
+    this.componentTestingHelper.triggerEvent({type: 'mouseup', target: 'seek-backward'});
     sinon.assert.calledOnce(window.clearInterval);
   });
 
   test('long press backward (touch)', function() {
 
     this.mediaPlayer.currentTime = 30;
-    this.mediaControls.triggerEvent({type: 'touchstart', target: 'seek-backward'});
+    this.componentTestingHelper.triggerEvent({type: 'touchstart', target: 'seek-backward'});
 
     // Advance the clock two seconds to simulate the user holding the
     // seek-backward button for two seconds -- player should seek
@@ -207,14 +206,14 @@ suite('GaiaMediaControls', function() {
     assert.equal(this.mediaPlayer.currentTime, 0);
 
     this.sinon.spy(window, 'clearInterval');
-    this.mediaControls.triggerEvent({type: 'touchend', target: 'seek-backward'});
+    this.componentTestingHelper.triggerEvent({type: 'touchend', target: 'seek-backward'});
     sinon.assert.calledOnce(window.clearInterval);
   });
 
   test('start moving slider (don\'nt know media duration)', function() {
     this.mediaPlayer.currentTime = 1;
     this.mediaPlayer.duration = Infinity;
-    this.mediaControls.triggerEvent({
+    this.componentTestingHelper.triggerEvent({
       type: 'touchstart',
       target: 'slider-wrapper',
       detail: {clientX: 50}
@@ -239,7 +238,7 @@ suite('GaiaMediaControls', function() {
     this.mediaPlayer.paused = false;
     navigator.mozL10n.language.direction = 'ltr';
 
-    this.mediaControls.triggerEvent({
+    this.componentTestingHelper.triggerEvent({
       type: 'touchstart',
       target: 'slider-wrapper',
       detail: {clientX: 50} // *touch* is 50 pixels from the slider 'left'.
@@ -261,7 +260,7 @@ suite('GaiaMediaControls', function() {
     this.mediaPlayer.paused = false;
     navigator.mozL10n.language.direction = 'ltr';
 
-    this.mediaControls.triggerEvent({
+    this.componentTestingHelper.triggerEvent({
       type: 'mousedown',
       target: 'slider-wrapper',
       detail: {clientX: 50} // *touch* is 50 pixels from the slider 'left'.
@@ -288,7 +287,7 @@ suite('GaiaMediaControls', function() {
     this.mediaPlayer.paused = true;
     navigator.mozL10n.language.direction = 'ltr';
 
-    this.mediaControls.triggerEvent({
+    this.componentTestingHelper.triggerEvent({
       type: 'touchstart',
       target: 'slider-wrapper',
       detail: {clientX: 25} // *touch* is 25 pixels from the slider 'left'.
@@ -315,7 +314,7 @@ suite('GaiaMediaControls', function() {
     this.mediaPlayer.paused = false;
     navigator.mozL10n.language.direction = 'rtl';
 
-    this.mediaControls.triggerEvent({
+    this.componentTestingHelper.triggerEvent({
       type: 'touchstart',
       target: 'slider-wrapper',
       detail: {clientX: 95} // *touch* is 5 pixels from the slider 'right'.
@@ -332,12 +331,12 @@ suite('GaiaMediaControls', function() {
     this.mediaPlayer.paused = false;
     navigator.mozL10n.language.direction = 'ltr';
 
-    this.mediaControls.triggerEvent({
+    this.componentTestingHelper.triggerEvent({
       type: 'touchstart',
       target: 'slider-wrapper',
       detail: {clientX: 50}
     });
-    this.mediaControls.triggerEvent({
+    this.componentTestingHelper.triggerEvent({
       type: 'touchmove',
       target: 'slider-wrapper',
       detail: {clientX: 75}
@@ -353,12 +352,12 @@ suite('GaiaMediaControls', function() {
     this.mediaPlayer.paused = false;
     navigator.mozL10n.language.direction = 'ltr';
 
-    this.mediaControls.triggerEvent({
+    this.componentTestingHelper.triggerEvent({
       type: 'touchstart',
       target: 'slider-wrapper',
       detail: {clientX: 25}
     });
-    this.mediaControls.triggerEvent({
+    this.componentTestingHelper.triggerEvent({
       type: 'touchmove',
       target: 'slider-wrapper',
       detail: {clientX: 55}
@@ -366,7 +365,7 @@ suite('GaiaMediaControls', function() {
 
     assert.equal(Math.floor(this.mediaPlayer.currentTime), 55);
   });
- 
+
   /*
    * Test for 'touchend' on the slider while the media was playing.
    * Slider has not been moved to the end of the video. Media should
@@ -381,12 +380,12 @@ suite('GaiaMediaControls', function() {
     this.mediaPlayer.paused = false;
     navigator.mozL10n.language.direction = 'ltr';
 
-    this.mediaControls.triggerEvent({
+    this.componentTestingHelper.triggerEvent({
       type: 'touchstart',
       target: 'slider-wrapper',
       detail: {clientX: 50}
     });
-    this.mediaControls.triggerEvent({
+    this.componentTestingHelper.triggerEvent({
       type: 'touchend',
       target: 'slider-wrapper'
     });
@@ -410,16 +409,153 @@ suite('GaiaMediaControls', function() {
     this.mediaPlayer.paused = false;
     navigator.mozL10n.language.direction = 'ltr';
 
-    this.mediaControls.triggerEvent({
+    console.log('durationText: ' + this.componentTestingHelper.getElement('duration-text'));
+    this.componentTestingHelper.triggerEvent({
       type: 'touchstart',
       target: 'slider-wrapper',
       detail: {clientX: 100}
     });
-    this.mediaControls.triggerEvent({
+    this.componentTestingHelper.triggerEvent({
       type: 'touchend',
       target: 'slider-wrapper',
     });
     // 'pause' was invoked on media player during processing of 'touchstart'
     sinon.assert.calledOnce(this.mediaPlayer.pause);
     sinon.assert.notCalled(this.mediaPlayer.play);
-  })});
+  })
+
+  test('\'loadedmetadata\' event', function() {
+    var mediaDuration = 50;
+    var expectedMediaDuration = '00:' + mediaDuration;
+    this.mediaPlayer.duration = mediaDuration;
+
+    this.componentTestingHelper.triggerEvent({
+      type: 'loadedmetadata',
+      target: 'media-player',
+    });
+
+    var durationTextContent =
+      this.componentTestingHelper.getElement('duration-text').textContent;
+    assert.equal(durationTextContent, expectedMediaDuration);
+  });
+
+  test('\'play\' event', function() {
+    var playButton =
+      this.componentTestingHelper.getElement('play');
+
+    // Simulate media being paused
+    playButton.classList.add('paused');
+
+    this.componentTestingHelper.triggerEvent({
+      type: 'play',
+      target: 'media-player',
+    });
+
+    assert.isFalse(playButton.classList.contains('paused'));
+    assert.equal(playButton.getAttribute('data-l10n-id'), 'playbackPlay');
+  });
+
+  test('\'pause\' event', function() {
+    var playButton =
+      this.componentTestingHelper.getElement('play');
+
+    // Simulate media playing
+    playButton.classList.remove('paused');
+
+    this.componentTestingHelper.triggerEvent({
+      type: 'pause',
+      target: 'media-player',
+    });
+
+    assert.isTrue(playButton.classList.contains('paused'));
+    assert.equal(playButton.getAttribute('data-l10n-id'), 'playbackPause');
+  });
+
+  /*
+   * Test 'timeupdate' event where play head is moved from left to right
+   */
+  test('\'timeupdate\' event (ltr)', function() {
+    var elapsedTextElement =
+      this.componentTestingHelper.getElement('elapsed-text');
+    var elapsedTimeElement =
+      this.componentTestingHelper.getElement('elapsed-time');
+    var playHeadElement =
+      this.componentTestingHelper.getElement('play-head');
+
+    var mediaDuration = 50;
+    var currentTime = 10;
+    this.mediaPlayer.duration = mediaDuration;
+    this.mediaPlayer.currentTime = currentTime;
+    var exptectedElapsedTimePercent = (currentTime / mediaDuration) * 100 + '%';
+    var expectedElapsedText = '00:' + currentTime;
+    navigator.mozL10n.language.direction = 'ltr';
+
+    this.componentTestingHelper.triggerEvent({
+      type: 'timeupdate',
+      target: 'media-player',
+    });
+
+    assert.equal(elapsedTextElement.textContent, expectedElapsedText);
+    assert.equal(elapsedTimeElement.style.width, exptectedElapsedTimePercent);
+    assert.equal(playHeadElement.style.left, exptectedElapsedTimePercent);
+  });
+
+  /*
+   * Test 'timeupdate' event where play head is moved from right to left
+   */
+  test('\'timeupdate\' event (rtl)', function() {
+    var elapsedTextElement =
+      this.componentTestingHelper.getElement('elapsed-text');
+    var elapsedTimeElement =
+      this.componentTestingHelper.getElement('elapsed-time');
+    var playHeadElement =
+      this.componentTestingHelper.getElement('play-head');
+
+    var mediaDuration = 50;
+    var currentTime = 10;
+    this.mediaPlayer.duration = mediaDuration;
+    this.mediaPlayer.currentTime = currentTime;
+    var exptectedElapsedTimePercent = (currentTime / mediaDuration) * 100 + '%';
+    var expectedElapsedText = '00:' + currentTime;
+    navigator.mozL10n.language.direction = 'rtl';
+
+    this.componentTestingHelper.triggerEvent({
+      type: 'timeupdate',
+      target: 'media-player',
+    });
+
+    assert.equal(elapsedTextElement.textContent, expectedElapsedText);
+    assert.equal(elapsedTimeElement.style.width, exptectedElapsedTimePercent);
+    assert.equal(playHeadElement.style.right, exptectedElapsedTimePercent);
+  });
+
+  test('\'timeupdate\' event (controls hidden)', function() {
+    var elapsedTextElement =
+      this.componentTestingHelper.getElement('elapsed-text');
+    var elapsedTimeElement =
+      this.componentTestingHelper.getElement('elapsed-time');
+    var playHeadElement =
+      this.componentTestingHelper.getElement('play-head');
+
+    var exptectedElapsedTimePercent = '10%';
+    var expectedElapsedText = '00:10';
+    navigator.mozL10n.language.direction = 'ltr';
+
+    elapsedTextElement.textContent = expectedElapsedText;
+    elapsedTimeElement.style.width = exptectedElapsedTimePercent;
+    playHeadElement.style.left = exptectedElapsedTimePercent;
+
+    this.mediaPlayer.duration = 50;
+    this.mediaPlayer.currentTime = 40;
+    this.mediaControls.hidden = true;
+
+    this.componentTestingHelper.triggerEvent({
+      type: 'timeupdate',
+      target: 'media-player',
+    });
+
+    assert.equal(elapsedTextElement.textContent, expectedElapsedText);
+    assert.equal(elapsedTimeElement.style.width, exptectedElapsedTimePercent);
+    assert.equal(playHeadElement.style.left, exptectedElapsedTimePercent);
+  });
+});

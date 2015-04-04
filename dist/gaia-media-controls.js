@@ -404,7 +404,7 @@ var MediaControls = Component.register('gaia-media-controls', {
     if (!this.shadowRoot) {
       this.setupShadowRoot();
     }
-    this.mediaControlsImpl = new MediaControlsImpl(this, this.shadowRoot, player);
+    this._impl = new MediaControlsImpl(this, this.shadowRoot, player);
   },
 
   detachFrom: function() {
@@ -414,20 +414,24 @@ var MediaControls = Component.register('gaia-media-controls', {
     }
   },
 
+  /*
+   * Expose testing helper functions
+   */
   enableComponentTesting() {
-    if (this.mediaControlsImpl) {
-      this.mediaControlsImpl.enableComponentTesting();
-    }
-  },
+    if (this._impl) {
+      this._impl.enableComponentTesting();
 
-  disableComponentTesting() {
-    if (this.mediaControlsImpl) {
-      this.mediaControlsImpl.disableComponentTesting();
+      var componentTestingHelper = {
+        triggerEvent:
+          this._impl.triggerEvent.bind(this._impl),
+        getElement:
+          this._impl.getElement.bind(this._impl),
+        disableComponentTesting:
+          this._impl.disableComponentTesting.bind(this._impl)
+      };
     }
-  },
 
-  triggerEvent: function(event) {
-    this.mediaControlsImpl.triggerEvent(event);
+    return componentTestingHelper;
   },
 
   template: `
@@ -945,10 +949,7 @@ MediaControlsImpl.prototype.updateMediaControlSlider = function() {
   this.els.elapsedText.textContent = this.formatTime(this.mediaPlayer.currentTime);
   this.els.elapsedTime.style.width = percent;
 
-  // Don't move the play head if the user is dragging it.
-  if (!this.dragging) {
-    this.movePlayHead(percent);
-  }
+  this.movePlayHead(percent);
 };
 
 MediaControlsImpl.prototype.movePlayHead = function(percent) {
@@ -1095,17 +1096,6 @@ MediaControlsImpl.prototype.seekBy = function(seekTime) {
   this.mediaPlayer.fastSeek(seekTime);
 };
 
-MediaControlsImpl.prototype.seekTo = function(pos) {
-  if (this.mediaControlsElement.getAttribute('demo')) {
-    console.log('using currentTime');
-    this.mediaPlayer.currentTime = pos;
-  }
-  else {
-    console.log('using fastSeek');
-    this.mediaPlayer.fastSeek(pos);
-  }
-};
-
 MediaControlsImpl.prototype.unload = function(e) {
   this.removeEventListeners();
 };
@@ -1114,17 +1104,21 @@ MediaControlsImpl.prototype.enableComponentTesting = function() {
   //
   // Define the buttons used by the component that will emit events
   //
-  this.buttons = {
+  this.elementsMap = {
     'play': 'play',
     'seek-forward': 'seekForward',
     'seek-backward': 'seekBackward',
-    'slider-wrapper': 'sliderWrapper'
+    'slider-wrapper': 'sliderWrapper',
+    'duration-text': 'durationText',
+    'elapsed-time': 'elapsedTime',
+    'elapsed-text': 'elapsedText',
+    'play-head': 'playHead'
   };
 
   // All elements need listeners for 'mousedown' and 'touchstart'
-  for (var button in this.buttons) {
-    this.els[this.buttons[button]].addEventListener('mousedown', this);
-    this.els[this.buttons[button]].addEventListener('touchstart', this);
+  for (var elName in this.elementsMap) {
+    this.els[this.elementsMap[elName]].addEventListener('mousedown', this);
+    this.els[this.elementsMap[elName]].addEventListener('touchstart', this);
   }
 
   // These elements need listeners for ending a touch
@@ -1142,19 +1136,20 @@ MediaControlsImpl.prototype.enableComponentTesting = function() {
   // handleEvent adds a 'mousemove' listener when it processes
   // 'mousedown' events.
   this.els.sliderWrapper.addEventListener('touchmove', this);
+
 };
 
 MediaControlsImpl.prototype.disableComponentTesting = function() {
 
-  for (var button in this.buttons) {
-    this.els[this.buttons[button]].removeEventListener('mousedown', this);
-    this.els[this.buttons[button]].removeEventListener('touchstart', this);
+  for (var elName in this.elementsMap) {
+    this.els[this.elementsMap[elName]].removeEventListener('mousedown', this);
+    this.els[this.elementsMap[elName]].removeEventListener('touchstart', this);
   }
 
   this.els.seekForward.removeEventListener('touchend', this);
   this.els.seekBackward.removeEventListener('touchend', this);
 
-  this.buttons = null;
+  this.elementsMap = null;
 
   if (this.intervalId) {
     clearInterval(this.intervalId);
@@ -1164,27 +1159,34 @@ MediaControlsImpl.prototype.disableComponentTesting = function() {
 
 MediaControlsImpl.prototype.triggerEvent = function(e) {
 
-  // mousedown and mousemove events on the slider-wrapper need a
-  // 'clientX' property indicating where on the slider the mouse
-  // was clicked.
-  var clientX = 0;
-  if ( e.target === 'slider-wrapper' &&
-      (e.type === 'mousedown' || e.type === 'mousemove') ) {
-    clientX = e.detail.clientX;
+  // Use a MouseEvent for mouse and touch events because
+  // TouchEvents are only available on a device and the
+  // tests are run in a browser.
+  var event;
+  if (/mouse/.test(e.type) || /touch/.test(e.type)) {
+
+    var clientX = e.detail ? e.detail.clientX : 0;
+    event = new MouseEvent(e.type, {clientX: clientX});
+
+    // Touch events need a 'changedTouches' object that specify
+    // the clientX value.
+    if (/touch/.test(e.type)) {
+      event.changedTouches = [{ clientX: clientX }];
+    }
+  }
+  else {
+    // Otherwise use a generic event
+    event = new Event(e.type);
   }
 
-  var event = new MouseEvent(e.type, {clientX: clientX});
+  var target = /player/.test(e.target) ? this.mediaPlayer :
+    this.els[this.elementsMap[e.target]];
+  console.log('dispatching ' + event.type + ' on ' + target)
+  target.dispatchEvent(event);
+};
 
-  // touchstart and touchmove events on the slider-wrapper neeed a
-  // 'changedTouches' object containing a 'clientX' property
-  // indicating where on the slider the *touch* occurred.
-  if ( e.target === 'slider-wrapper' &&
-      (e.type === 'touchstart' || e.type === 'touchmove') ) {
-    event.changedTouches = [{ clientX: e.detail.clientX }];
-  }
-
-  console.log('dispatching ' + event.type + ' on ' + this.els[this.buttons[e.target]]);
-  this.els[this.buttons[e.target]].dispatchEvent(event);
+MediaControlsImpl.prototype.getElement = function(name) {
+  return this.els[this.elementsMap[name]];
 };
 
 module.exports = MediaControlsImpl;

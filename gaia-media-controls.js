@@ -23,7 +23,7 @@ var MediaControls = Component.register('gaia-media-controls', {
     if (!this.shadowRoot) {
       this.setupShadowRoot();
     }
-    this.mediaControlsImpl = new MediaControlsImpl(this, this.shadowRoot, player);
+    this._impl = new MediaControlsImpl(this, this.shadowRoot, player);
   },
 
   detachFrom: function() {
@@ -33,20 +33,24 @@ var MediaControls = Component.register('gaia-media-controls', {
     }
   },
 
+  /*
+   * Expose testing helper functions
+   */
   enableComponentTesting() {
-    if (this.mediaControlsImpl) {
-      this.mediaControlsImpl.enableComponentTesting();
-    }
-  },
+    if (this._impl) {
+      this._impl.enableComponentTesting();
 
-  disableComponentTesting() {
-    if (this.mediaControlsImpl) {
-      this.mediaControlsImpl.disableComponentTesting();
+      var componentTestingHelper = {
+        triggerEvent:
+          this._impl.triggerEvent.bind(this._impl),
+        getElement:
+          this._impl.getElement.bind(this._impl),
+        disableComponentTesting:
+          this._impl.disableComponentTesting.bind(this._impl)
+      };
     }
-  },
 
-  triggerEvent: function(event) {
-    this.mediaControlsImpl.triggerEvent(event);
+    return componentTestingHelper;
   },
 
   template: `
