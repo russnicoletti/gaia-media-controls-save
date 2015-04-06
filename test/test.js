@@ -16,15 +16,11 @@ suite('GaiaMediaControls', function() {
 
   suiteSetup(function() {
 
+    // register a mock video element so that the tests can set
+    // read-only 'video' element properties.
     registerComponent('mock-video', {
-      createdCallback: function() {
-        console.log('creating mock-video web component...');
-      },
-
       play: function() {},
-
       pause: function() {},
-
       fastSeek: function(pos) {
         this.currentTime = pos;
       }
@@ -32,16 +28,23 @@ suite('GaiaMediaControls', function() {
 
     nativeMozL10n = navigator.mozL10n;
     navigator.mozL10n = MockL10n;
+
+    // This object is returned by our mock getBoundingClientRect
+    // function. The 'width' property is constant; the 'left' and
+    // 'right' properties vary based on the the individual test
+    // (depending on whether the test is testing left to right or
+    //  right to left scenarios). 
     this.clientRect = {'width': 100};
-  });
 
-  suiteTeardown(function() {
-    navigator.mozL10n = nativeMozL10n;
-  });
-
-  setup(function() {
-    this.sinon = sinon.sandbox.create();
-    this.clock = sinon.useFakeTimers();
+    // Mock the getBoundingClientRect function so the test
+    // can dictate the dimensions of the slider bar.
+    getBoundingClientRect = HTMLElement.prototype.getBoundingClientRect;
+    var self = this;
+    var mockGetBoundingClientRect = function() {
+      console.log('returning clientRect: ' + JSON.stringify(self.clientRect));
+      return self.clientRect;
+    };
+    HTMLElement.prototype.getBoundingClientRect = mockGetBoundingClientRect;
 
     // DOM container to put test cases
     this.dom = document.createElement('div');
@@ -54,33 +57,26 @@ suite('GaiaMediaControls', function() {
     this.mediaPlayer = document.getElementById('media-player');
     this.mediaControls.attachTo(this.mediaPlayer);
     this.componentTestingHelper = this.mediaControls.enableComponentTesting();
+  });
+
+  suiteTeardown(function() {
+    navigator.mozL10n = nativeMozL10n;
+    HTMLElement.prototype.getBoundingClientRect = getBoundingClientRect;
+
+    this.dom.remove();
+    this.componentTestingHelper.disableComponentTesting();
+  });
+
+  setup(function() {
+    this.sinon = sinon.sandbox.create();
+    this.clock = sinon.useFakeTimers();
     this.sinon.spy(this.mediaPlayer, 'play');
     this.sinon.spy(this.mediaPlayer, 'pause');
-
-    // Mock the getBoundingClientRect function so the test
-    // can dictate the dimensions of the slider bar.
-    getBoundingClientRect = HTMLElement.prototype.getBoundingClientRect;
-    var self = this;
-    var mockGetBoundingClientRect = function() {
-      var clientRect = {'width': 100};
-      if (navigator.mozL10n.language.direction === 'ltr') {
-        clientRect.left = self.clientRect.left;
-      }
-      else if (navigator.mozL10n.language.direction === 'rtl') {
-        clientRect.right = self.clientRect.right;
-      }
-
-      return clientRect;
-   };
-   HTMLElement.prototype.getBoundingClientRect = mockGetBoundingClientRect;
   });
 
   teardown(function() {
     this.sinon.restore();
-    this.dom.remove();
     this.clock.restore();
-    this.componentTestingHelper.disableComponentTesting();
-    HTMLElement.prototype.getBoundingClientRect = getBoundingClientRect;
   });
 
   test('play button plays (mouse)', function() {
@@ -247,6 +243,12 @@ suite('GaiaMediaControls', function() {
     assert.equal(Math.floor(this.mediaPlayer.currentTime), 50);
     sinon.assert.notCalled(this.mediaPlayer.play);
     sinon.assert.calledOnce(this.mediaPlayer.pause);
+
+    // End the sliding
+    this.componentTestingHelper.triggerEvent({
+      type: 'touchend',
+      target: 'slider-wrapper',
+    });
   });
 
   /*
@@ -269,6 +271,12 @@ suite('GaiaMediaControls', function() {
     assert.equal(Math.floor(this.mediaPlayer.currentTime), 50);
     sinon.assert.notCalled(this.mediaPlayer.play);
     sinon.assert.calledOnce(this.mediaPlayer.pause);
+
+    // End the sliding
+    this.componentTestingHelper.triggerEvent({
+      type: 'mouseup',
+      target: 'slider-wrapper',
+    });
   });
 
   /*
@@ -296,6 +304,12 @@ suite('GaiaMediaControls', function() {
     assert.equal(Math.floor(this.mediaPlayer.currentTime), 25);
     sinon.assert.notCalled(this.mediaPlayer.play);
     sinon.assert.notCalled(this.mediaPlayer.pause);
+
+    // End the sliding
+    this.componentTestingHelper.triggerEvent({
+      type: 'touchend',
+      target: 'slider-wrapper',
+    });
   });
 
   /*
@@ -322,6 +336,12 @@ suite('GaiaMediaControls', function() {
 
     assert.equal(Math.floor(this.mediaPlayer.currentTime), 5);
     sinon.assert.calledOnce(this.mediaPlayer.pause);
+
+    // End the sliding
+    this.componentTestingHelper.triggerEvent({
+      type: 'touchend',
+      target: 'slider-wrapper',
+    });
   });
 
   test('Moving slider, direction is ltr', function() {
@@ -343,6 +363,12 @@ suite('GaiaMediaControls', function() {
     });
 
     assert.equal(Math.floor(this.mediaPlayer.currentTime), 75);
+
+    // End the sliding
+    this.componentTestingHelper.triggerEvent({
+      type: 'touchend',
+      target: 'slider-wrapper',
+    });
   });
 
   test('Moving slider, direction is rtl', function() {
@@ -364,6 +390,12 @@ suite('GaiaMediaControls', function() {
     });
 
     assert.equal(Math.floor(this.mediaPlayer.currentTime), 55);
+
+    // End the sliding
+    this.componentTestingHelper.triggerEvent({
+      type: 'touchend',
+      target: 'slider-wrapper',
+    });
   });
 
   /*
