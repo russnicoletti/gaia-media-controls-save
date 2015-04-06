@@ -1,235 +1,209 @@
+;(function(define){'use strict';define(function(require,exports,module){
+
 /**
  * Dependencies
  */
-
 var Component = require('gaia-component');
-var VideoControls = require('./lib/video_controls');
-  
-// Load 'gaia-icons' font-family
-require('gaia-icons');
+var MediaControlsImpl = require('./lib/media-controls-impl');
 
-function toCamelCase(str) {
-  return str.replace(/\-(.)/g, function replacer(str, p1) {
-    return p1.toUpperCase();
-  });
-}
-
-var gaiaMediaControls = Component.register('gaia-media-controls', {
+var MediaControls = Component.register('gaia-media-controls', {
   /**
-   * Called when the element is first created.
-   *
-   * Here we create the shadow-root and
-   * inject our template into it.
-   *
-   * @private
+   * 'createdCallback' is called when the element is first created.
    */
   created: function() {
     console.log('creating gaia-media-controls web component...');
-    
-    var shadowRoot = this.createShadowRoot();
-    shadowRoot.innerHTML = this.template;
-
-    var dom = {};
-    var ids = [
-        'elapsed-text', 'elapsedTime', 'bufferedTime', 'timeBackground', 'duration-text',
-        'playHead', 'slider-wrapper', 'seek-backward', 'play', 'seek-forward'
-    ];
-
-    console.log('reading dom elements...');
-    ids.forEach(function createElementRef(name) {
-      dom[toCamelCase(name)] = shadowRoot.getElementById(name);
-    });
-    console.log('done reading dom elements...');
-
-    this.videoControls = new VideoControls(dom);
-    console.log('done instantiating VideoControls');
   },
 
-  foo: function() {
-    this.videoControls.foo(); 
+  attachTo: function(player) {
+
+    if (this.mediaPlayerImpl) {
+      throw new Error('A media player is already attached to the media controls component');
+    }
+
+    if (!this.shadowRoot) {
+      this.setupShadowRoot();
+    }
+    this._impl = new MediaControlsImpl(this, this.shadowRoot, player);
   },
 
-  enablePlayButton: function() {
-    this.videoControls.enablePlayButton();
+  detachFrom: function() {
+    if (this.mediaPlayerImpl) {
+      this.mediaPlayerImpl.unload();
+      this.mediaPlayerImpl = null;
+    }
   },
 
-  enablePauseButton: function() {
-    this.videoControls.enablePauseButton();
-  },
+  /*
+   * Expose testing helper functions
+   */
+  enableComponentTesting() {
+    if (this._impl) {
+      this._impl.enableComponentTesting();
 
-  setMediaDurationText: function(duration) {
-    this.videoControls.setMediaDurationText(duration);
-  },
+      var componentTestingHelper = {
+        triggerEvent:
+          this._impl.triggerEvent.bind(this._impl),
+        getElement:
+          this._impl.getElement.bind(this._impl),
+        disableComponentTesting:
+          this._impl.disableComponentTesting.bind(this._impl)
+      };
+    }
 
-  updateSlider: function(player) {
-    this.videoControls.updateSlider(player);
-  },
-
-  handleSliderTouchStart: function(event, player) {
-    console.log(Date.now() + '--gaia-media-controls, handleSliderTouchStart begin');
-    console.log(Date.now() + '--event.changedTouches: ' + event.changedTouches);
-    console.log(Date.now() + '--player: ' + player);
-    console.log(Date.now() + '--Invoking VideoControls to handle touch start event');
-    this.videoControls.sliderTouchStart(event, player);
-  },
-
-  handleSliderTouchMove: function(event, player) {
-    this.videoControls.sliderTouchMove(event, player);
-  },
-
-  handleSliderTouchEnd: function(event, player, pause) {
-    this.videoControls.sliderTouchEnd(event, player, pause);
+    return componentTestingHelper;
   },
 
   template: `
- 
+
   <style>
 
-@font-face {
-	font-family: "gaia-icons";
-	src: url("fonts/gaia-icons.ttf") format("truetype");
-	font-weight: 500;
-	font-style: normal;
-}
+  @font-face {
+  	font-family: "gaia-icons";
+  	src: url("fonts/gaia-icons.ttf") format("truetype");
+  	font-weight: 500;
+  	font-style: normal;
+  }
 
-[data-icon]:before,
-.ligature-icons {
-	font-family: "gaia-icons";
-	content: attr(data-icon);
-	display: inline-block;
-	font-weight: 500;
-	font-style: normal;
-	text-decoration: inherit;
-	text-transform: none;
-	text-rendering: optimizeLegibility;
-	font-size: 30px;
-	-webkit-font-smoothing: antialiased;
-}
+  [data-icon]:before {
+  	font-family: "gaia-icons";
+  	content: attr(data-icon);
+  	display: inline-block;
+  	font-weight: 500;
+  	font-style: normal;
+  	text-decoration: inherit;
+  	text-transform: none;
+  	text-rendering: optimizeLegibility;
+  	font-size: 30px;
+  	-webkit-font-smoothing: antialiased;
+  }
 
-  footer {
-    background: rgba(0, 0, 0, 0.75);
-    height: 4rem;
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    z-index: 1;
+  .media-controls-container {
+    background-color: rgba(0,0,0, 0.85);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+    align-items: stretch;
+    min-width: 30rem;
   }
 
   /* video bar -- duration, time slider, elapsed time */
-  #videoBar {
-    position: absolute;
-    right: 0;
-    bottom: 4.4rem;
-    left: 0;
-    height: 4rem;
+  .time-slider-bar {
+    display: flex;
+    flex-flow: row;
+    align-items: center;
     font-size: 0;
     border-bottom: 0.1rem solid rgba(255,255,255, 0.1);
-    background-color: rgba(0,0,0, 0.85);
-    white-space: nowrap;
-    z-index: 10;
   }
-  
-  #videoBar:last-child {
-    bottom: 0;
-  }
-  
-  #elapsed-text,
-  #timeSlider,
-  #slider-wrapper,
-  #duration-text {
-    display: inline-block;
-    position: relative;
-    line-height: 4.2rem;
-    vertical-align: top;
-  }
-  
-  #elapsed-text, #duration-text {
+
+  /* 1. elapsed-text and duration-text have padding on left and right
+        to support ltr and rtl locales */
+  /* 2. The elapsed time and duration elements do not grow and shrink
+        via the flexbox. They are fixed width */
+  .elapsed-text, .duration-text {
     color: #ffffff;
     font-size: 1.4rem;
-  }
-  
-  /* elapsed-text and duration-text have padding on left and right
-     to support ltr and rtl locales */
-  #elapsed-text {
-    width: 3.8rem;
-    padding: 0 1.5rem;
+    padding: 0 1.5rem; /* 1 */
+    flex-grow: 0;      /* 2 */
     text-align: center;
   }
-  
-  #duration-text {
-    width: 3.8rem;
-    padding: 0 1.5rem;
-    text-align: center;
-  }
-  
-  /* time slider */
-  #timeSlider {
-    position: relative;
-    width: 100%;
-    z-index: 10;
-  }
-  
-  #slider-wrapper {
-    /* Take into account width and padding of elapsed and duration text */
-    width: calc(100% - 13.6rem);
+
+  /* 1. The slider element grows and shrinks via the flexbox */
+  .slider-wrapper {
+    flex-grow: 1;   /* 1 */
     height: 4.2rem;
   }
-  
-  #slider-wrapper div {
-    position: absolute;
-    pointer-events: none;
-  }
-  
+
   .progress {
-    height: 0.3rem;
+    position: relative;
+    pointer-events: none;
     width: 0;
-    top: 50%;
-    margin-top: -0.1rem;
   }
-  
-  #elapsedTime {
+
+  /* 1. Center elements vertically within time-slider; 'top: 50%' centers the
+   *    top of the element vertically; 'elapsed-time' is the first element
+   *    to be layed out, it is 0.3rem in height, therefore 'top:50%' would
+   *    position the center of the element 0.1rem below the middle: move
+   *    it up 0.1rem to center the middle of the element vertically.
+   *    'time-background' is layed out after 'elapsed-time' and is 0.1rem in
+   *    height. With 'elapsed-time' being 0.3rem in height, 'top:50%' would
+   *    position 'time-background' 0.3rem below the center vertically: move it
+   *    up 0.3rem to center it vertically.
+   *
+   * 2. Ensure the layering order of time background,
+        elapsed time, and play head.
+   */
+
+  .elapsed-time {
+    height: 0.3rem;
     background-color: #00caf2;
-    z-index: 30;
-    margin-top: -0.2rem;
+    top: calc(50% - 0.1rem); /* 1 */
+    z-index: 20; /* 2 */
   }
-  
-  #bufferedTime {
-    background-color: blue;
-    z-index: 20;
-  }
-  
-  #timeBackground {
+
+  .time-background {
     width: 100%;
     height: 0.1rem;
+    top: calc(50% - 0.3rem); /* 1 */
     background-color: #a6b4b6;
-    z-index: 10;
+    z-index: 10; /* 2 */
   }
-  
-  #playHead {
-    position: absolute;
-    top: calc(50% - 1.15rem);
+  /*
+   * 1. Center 'play-head' vertically. 'top' is relative to the other
+   *    'slider-wrapper' elements which are 0.4rem in height; therefore,
+   *    'top:50%' would position the top of the element 0.4rem below the
+   *    the center of the 'sider-wrapper'. In order to position the center
+   *    of the element vertically, move it up by half its height plus
+   *    the height of the previously layed out elements.
+   *
+   * 2. Ensure the layering order of time background,
+   *    elapsed time, and play head.
+   */
+  .play-head {
+    top: calc(50% - (1.15rem + 0.4rem));
+    position: relative;
     width: 2.3rem;
     height: 2.3rem;
+
+    /* For LTR langauges, position the playhead 1.15 rems to the left
+     * so that the center of the playhead aligns with the beginning of
+     * the time slider.
+     */
     margin-left: -1.15rem;
+
+    /* For RTL langauges, position the playhead 1.15 rems to the right
+     * so that the center of the playhead aligns with the end of
+     * the time slider.
+     */
+    margin-right: -1.15rem;
+
     border: none;
     background: none;
     pointer-events: none;
-    z-index: 40;
+    z-index: 30; /* 2 */
   }
-  
-  #playHead:after {
+
+  /*
+   * Define the 'normal' play-head graphic. Using the 'after' pseudo-element
+   * here specifies that the 'normal' (smaller, white) play-head will
+   * appear on top of the larger, blue 'active' play-head (specified using
+   * the 'before' pseudo-element).
+   */
+  .play-head:after {
     content: "";
     position: absolute;
-    top: calc(50% - 1.15rem);
+    top: 0;
     left: calc(50% - 1.15rem);
     width: 2.3rem;
     height: 2.3rem;
     border-radius: 50%;
     background-color: #fff;
   }
-  
-  #playHead.active:before {
+
+  /* Define the 'active' play-head graphic (blue, larger than the 'normal'
+   * play-head). Using the 'before' pseudo-element specifies that the 'active'
+   * play-head will appear under the 'normal' play-head.
+   */
+  .play-head.active:before {
     content: "";
     position: absolute;
     top: calc(50% - 3.05rem);
@@ -240,96 +214,78 @@ var gaiaMediaControls = Component.register('gaia-media-controls', {
     background-color: #00CAF2;
   }
 
-  /* video control bar -- rewind, pause/play, forward */
-  #videoControlBar {
-    height: 4.5rem;
-  }
-  #videoControlBar {
-    height: 4.5rem;
-  }
-  
-  #videoToolBar {
-    position: relative;
-    height: 4.8rem;
-    font-size: 0;
-    vertical-align: top;
+  /* video control bar -- rewind, pause/play, forward
+   *
+   * 1. The buttons should always display left-to-right.
+   */
+  .video-control-bar {
+    display: flex;
+    flex-direction: row;
+    flex-basis: 4.8rem;
     border-top: 0.1rem solid rgba(255,255,255, 0.1);
-    background-color: #000;
+    background-color: rgba(0,0,0, 0.95);
     overflow: hidden;
-    direction: ltr
+    direction: ltr; /* 1 */
+    /*z-index: 10*/;
   }
-  
-  #seek-backward,
-  #seek-forward,
-  #play {
-    position: relative;
-    height: 100%;
+
+  .seek-backward,
+  .seek-forward,
+  .play {
+    /* All three elements grow and shrink together by the same proportion */
+    flex-grow: 1;
     padding: 0;
-    font-weight: 500;
-    background-position: center center;
-    background-repeat: no-repeat;
-    background-size: 3rem;
   }
-  
-  #seek-backward,
-  #seek-forward {
-    width: 33%;
-  }
-  
-  #play {
-    width: 34%;
-  }
-  
-  #play.paused:before {
+
+  .play.paused:before {
     content: 'play';
     padding-left: 4px;
   }
-  
+
   .player-controls-button {
     color: #FFFFFF;
     border: none;
     border-radius: 0;
     background: transparent;
   }
-  
+
   .player-controls-button:hover {
     background: transparent;
   }
-  
+
   .player-controls-button:active {
     background: #00caf2;
   }
-  
+
   .player-controls-button:disabled {
     opacity: 0.3;
   }
-  
+
   .player-controls-button:disabled:active {
     background: transparent;
   }
 
   </style>
 
-  <footer id="videoBar">
-    <div id="timeSlider">
-      <span id="elapsed-text"></span>
-      <div id="slider-wrapper">
-        <div id="elapsedTime" class="progress"></div>
-        <div id="bufferedTime" class="progress"></div>
-        <div id="timeBackground" class="progress"></div>
-        <button id="playHead"></button>
+  <div class="media-controls-container">
+    <div class="time-slider-bar">
+      <span class="elapsed-text"></span>
+      <div class="slider-wrapper">
+        <div class="elapsed-time progress"></div>
+        <div class="time-background progress"></div>
+        <button class="play-head"></button>
       </div>
-      <span id="duration-text"></span>
+      <span class="duration-text"></span>
     </div>
-    <div id="fullscreen-button"></div>
-  </footer>
-  <footer id="videoControlBar">
-    <div id="videoToolBar">
-      <button id="seek-backward" class="player-controls-button" data-icon="skip-back"></button>
-      <button id="play" class="player-controls-button" data-icon="pause"></button>
-      <button id="seek-forward" class="player-controls-button" data-icon="skip-forward"></button>
+    <div class="video-control-bar">
+      <button class="seek-backward player-controls-button" data-icon="skip-back"></button>
+      <button class="play player-controls-button" data-icon="pause"></button>
+      <button class="seek-forward player-controls-button" data-icon="skip-forward"></button>
     </div>
-  </footer>`
+  </div>`
 });
 
-module.exports = gaiaMediaControls;
+});})(typeof define=='function'&&define.amd?define
+:(function(n,w){'use strict';return typeof module=='object'?function(c){
+c(require,exports,module);}:function(c){var m={exports:{}};c(function(n){
+return w[n];},m.exports,m);w[n]=m.exports;};})('gaia-media-controls',this));
