@@ -877,12 +877,6 @@ MediaControlsImpl.prototype.handleEvent = function(e) {
       // Update the progress bar and play head as the video plays
       //
       if (!this.mediaControlsElement.hidden) {
-        // We can't update a progress bar if we don't know how long
-        // the video is.
-        if (this.mediaPlayer.duration === Infinity || this.mediaPlayer.duration === 0) {
-          return;
-        }
-
         this.updateMediaControlSlider();
       }
       break;
@@ -904,7 +898,7 @@ MediaControlsImpl.prototype.handleEvent = function(e) {
       }
 
       // If the media was played until the end (as opposed to being forwarded
-      // to the end, position the player at the beginning of the video.
+      // to the end), position the player at the beginning of the video.
       if (this.playedUntilEnd) {
         this.mediaPlayer.currentTime = 0;
         this.playedUntilEnd = false;
@@ -939,6 +933,12 @@ MediaControlsImpl.prototype.handleEvent = function(e) {
 };
 
 MediaControlsImpl.prototype.updateMediaControlSlider = function() {
+
+  // Sanity check: we can't update a progress bar if we don't know how long
+  // the video is.
+  if (this.mediaPlayer.duration === Infinity || this.mediaPlayer.duration === 0) {
+    return;
+  }
 
   var percent = (this.mediaPlayer.currentTime / this.mediaPlayer.duration) * 100;
   if (isNaN(percent)) {
@@ -1181,7 +1181,7 @@ MediaControlsImpl.prototype.triggerEvent = function(e) {
 
   var target = /player/.test(e.target) ? this.mediaPlayer :
     this.els[this.elementsMap[e.target]];
-  console.log('dispatching ' + event.type + ' on ' + target)
+  console.log('dispatching ' + event.type + ' event on ' + target)
   target.dispatchEvent(event);
 };
 

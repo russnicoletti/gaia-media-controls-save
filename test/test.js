@@ -558,4 +558,132 @@ suite('GaiaMediaControls', function() {
     assert.equal(elapsedTimeElement.style.width, exptectedElapsedTimePercent);
     assert.equal(playHeadElement.style.left, exptectedElapsedTimePercent);
   });
+
+  /*
+   * Test 'seeked' event where play head is moved from left to right
+   */
+  test('\'seeked\' event (ltr)', function() {
+    var elapsedTextElement =
+      this.componentTestingHelper.getElement('elapsed-text');
+    var elapsedTimeElement =
+      this.componentTestingHelper.getElement('elapsed-time');
+    var playHeadElement =
+      this.componentTestingHelper.getElement('play-head');
+
+    var mediaDuration = 50;
+    var currentTime = 10;
+    this.mediaPlayer.duration = mediaDuration;
+    this.mediaPlayer.currentTime = currentTime;
+    var exptectedElapsedTimePercent = (currentTime / mediaDuration) * 100 + '%';
+    var expectedElapsedText = '00:' + currentTime;
+    navigator.mozL10n.language.direction = 'ltr';
+
+    this.componentTestingHelper.triggerEvent({
+      type: 'seeked',
+      target: 'media-player',
+    });
+
+    assert.equal(elapsedTextElement.textContent, expectedElapsedText);
+    assert.equal(elapsedTimeElement.style.width, exptectedElapsedTimePercent);
+    assert.equal(playHeadElement.style.left, exptectedElapsedTimePercent);
+  });
+
+  /*
+   * Test 'seeked' event where play head is moved from right to left
+   */
+  test('\'seeked\' event (rtl)', function() {
+    var elapsedTextElement =
+      this.componentTestingHelper.getElement('elapsed-text');
+    var elapsedTimeElement =
+      this.componentTestingHelper.getElement('elapsed-time');
+    var playHeadElement =
+      this.componentTestingHelper.getElement('play-head');
+
+    var mediaDuration = 50;
+    var currentTime = 10;
+    this.mediaPlayer.duration = mediaDuration;
+    this.mediaPlayer.currentTime = currentTime;
+    var exptectedElapsedTimePercent = (currentTime / mediaDuration) * 100 + '%';
+    var expectedElapsedText = '00:' + currentTime;
+    navigator.mozL10n.language.direction = 'rtl';
+
+    this.componentTestingHelper.triggerEvent({
+      type: 'seeked',
+      target: 'media-player',
+    });
+
+    assert.equal(elapsedTextElement.textContent, expectedElapsedText);
+    assert.equal(elapsedTimeElement.style.width, exptectedElapsedTimePercent);
+    assert.equal(playHeadElement.style.right, exptectedElapsedTimePercent);
+  });
+
+  /*
+   * Test 'ended' event where media is played until the end
+   */
+  test('\'ended\' event (played until end)', function() {
+    // Simulate playing the media until the end by setting currentTime
+    // to the duration of the media and generating a 'pause' event
+    this.mediaPlayer.duration = 10;
+    this.mediaPlayer.currentTime = this.mediaPlayer.duration;
+    this.componentTestingHelper.triggerEvent({
+      type: 'pause',
+      target: 'media-player',
+    });
+
+    this.componentTestingHelper.triggerEvent({
+      type: 'ended',
+      target: 'media-player',
+    });
+
+    assert.equal(this.mediaPlayer.currentTime, 0);
+  });
+
+  /*
+   * Test 'ended' event where media is forwarded to pricisely to the
+   * end of the media (currentTime is equal to duration)
+   */
+  test('\'ended\' event (forward to end exactly)', function() {
+    // Simulate the media being forwarded to the end by setting
+    // the position to where it will move to the end when
+    // forwarded.
+    var mediaDuration = 20;
+    this.mediaPlayer.duration = mediaDuration;
+    this.mediaPlayer.currentTime = 10;
+    this.componentTestingHelper.triggerEvent({
+      type: 'touchstart',
+      target: 'seek-forward'
+    });
+
+    this.componentTestingHelper.triggerEvent({
+      type: 'ended',
+      target: 'media-player',
+    });
+
+    assert.equal(this.mediaPlayer.currentTime, mediaDuration);
+  });
+
+  /*
+   * Test 'ended' event where media is forwarded such that it would
+   * end up past the end based on the position of currentTime before
+   * the forwarding.
+   */
+  test('\'ended\' event (forward to end -- past the end)', function() {
+    // Simulate the media being forwarded to the end by setting
+    // the position to where it will move to the end when
+    // forwarded.
+    var mediaDuration = 20;
+    this.mediaPlayer.duration = mediaDuration;
+    this.mediaPlayer.currentTime = (mediaDuration - 1);
+    this.componentTestingHelper.triggerEvent({
+      type: 'touchstart',
+      target: 'seek-forward'
+    });
+
+    this.componentTestingHelper.triggerEvent({
+      type: 'ended',
+      target: 'media-player',
+    });
+
+    assert.equal(this.mediaPlayer.currentTime, mediaDuration);
+  });
 });
